@@ -8,8 +8,52 @@ datasource db {
 }
 
 
-model User {
-  id    Int     @id @default(autoincrement())
-  name  String? @db.VarChar(255)
-  email String  @unique @db.VarChar(255)
+model Task {
+  id        BigInt  @id @default(autoincrement())
+  title     String
+  description String
+  completed Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Experiments {
+  id       BigInt  @id @default(autoincrement())
+  title     String
+  description String
+  status ExperimentStatus @default(PLANNED)
+  startDate DateTime
+  endDate DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ExperimentEquipmentUsage ExperimentEquipmentUsage[]
+}
+
+model Inventory {
+  id       BigInt  @id @default(autoincrement())
+  name     String
+  description String
+  avaiable Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ExperimentEquipmentUsage ExperimentEquipmentUsage[]
+}
+
+model ExperimentEquipmentUsage {
+  id           BigInt     @id @default(autoincrement())
+  experimentId BigInt
+  equipmentId  BigInt
+  experiment   Experiments @relation(fields: [experimentId], references: [id])
+  equipment    Inventory   @relation(fields: [equipmentId], references: [id])
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+enum ExperimentStatus {
+  PLANNED
+  ONGOING
+  COMPLETED
+  CANCELLED
 }
