@@ -1,7 +1,7 @@
 "use client";
-import Image from "next/image";
 import Head from "next/head";
 import { useState } from "react";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 export default function Home() {
   return (
@@ -103,3 +103,4 @@ function Schedule() {
     </div>
   );
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
