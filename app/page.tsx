@@ -1,6 +1,7 @@
 'use client';
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
+import { TaskAddRequest } from './api/task/route';
 
 export default function Home() {
   return (
@@ -21,11 +22,37 @@ function TodoList() {
   const [tasks, setTasks] = useState<string[]>([]);
   const [task, setTask] = useState('');
 
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const response = await fetch('/api/task');
+      const tasks = await response.json();
+      console.log('Tasks:', tasks);
+      const taskTitles = tasks.map((task: { title: string }) => task.title);
+      setTasks(taskTitles);
+    };
+    fetchTasks();
+  }, []);
+
   const addTask = () => {
-    if (task.trim()) {
-      setTasks([...tasks, task]); // TODO: Save tasks to a database
+    const addTaskToDB = async (task: TaskAddRequest) => {
+      const response = await fetch('/api/task', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(task),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to add task');
+        return;
+      }
+
+      const newTask = await response.json();
+      setTasks((prevTasks) => [...prevTasks, newTask.title]);
       setTask('');
-    }
+    };
+    addTaskToDB({ title: task, description: '', completed: false });
   };
 
   return (
