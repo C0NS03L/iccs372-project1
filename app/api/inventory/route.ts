@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -9,7 +9,7 @@ export async function GET() {
     // FROM "Inventory"
     // GROUP BY name
     const inventory = await prisma.inventory.groupBy({
-      by: ["name"],
+      by: ['name'],
       _count: {
         name: true,
       },
@@ -25,7 +25,7 @@ export async function GET() {
     return NextResponse.json(formattedInventory);
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to fetch inventory" + error },
+      { error: 'Failed to fetch inventory' + error },
       { status: 500 }
     );
   }
