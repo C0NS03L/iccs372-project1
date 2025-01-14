@@ -1,6 +1,6 @@
 "use client";
 import Head from "next/head";
-import { useState } from "react";
+import {useEffect, useState} from "react";
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 export default function Home() {
@@ -57,38 +57,58 @@ function TodoList() {
     </div>
   );
 }
-
 function StockTracking() {
-  const [stocks, setStocks] = useState([
-    { symbol: "AAPL", amount: 150 },
-    { symbol: "TSLA", amount: 700 },
-  ]); //TODO: Fetch stock prices from an API
+  const [stocks, setStocks] = useState([]);
 
-  return (
+    useEffect(() => {
+        const fetchStocks = async () => {
+            const response = await fetch('/api/inventory');
+            const inventory = await response.json();
+            console.log("Inventory:"+ inventory);
+            setStocks(inventory);
+        };
+            fetchStocks();
+    }, []);
+
+
+    return (
     <div className="bg-gray-800 p-4 rounded shadow col-span-1 row-span-1">
       <h2 className="text-xl font-bold">Stock Tracking</h2>
       <ul className="mt-4">
         {stocks.map((stock, index) => (
-          <li
-            key={index}
-            className="border-b border-gray-700 py-2 flex justify-between"
-          >
-            <span>{stock.symbol}</span>
-            <span>${stock.amount}</span>
+          <li key={index} className="border-b border-gray-700 py-2">
+            <span>
+              {stock.name} - {stock.stock}
+            </span>
           </li>
         ))}
       </ul>
     </div>
-  );
+    );
 }
 
-function Schedule() {
-  const [events, setEvents] = useState([
-    { time: "9:00 AM", activity: "Team meeting" },
-    { time: "2:00 PM", activity: "Project review" },
-  ]); // TODO: Fetch events from a DB/API
 
-  return (
+function Schedule() {
+  const [events, setEvents] = useState([]);
+
+    useEffect(() => {
+        const fetchEvents = async () => {
+            const response = await fetch('/api/experiment');
+            const experiments = await response.json();
+            console.log("Experiments:"+ experiments);
+            const formattedExperiments = experiments.map((experiment: { startDate: string; title: string }) => ({
+                time: new Date(experiment.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                activity: experiment.title,
+            }));
+            console.log("Formatted Experiments:"+ formattedExperiments);
+            setEvents(formattedExperiments);
+        };
+
+        fetchEvents();
+    }, []);
+
+
+    return (
     <div className="bg-gray-800 p-4 rounded shadow col-span-1 row-span-1">
       <h2 className="text-xl font-bold">Schedule</h2>
       <ul className="mt-4">
