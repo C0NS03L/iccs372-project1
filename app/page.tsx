@@ -18,7 +18,7 @@ export default function Home() {
 }
 
 function TodoList() {
-  const [tasks, setTasks] = useState([]);
+  const [tasks, setTasks] = useState<string[]>([]);
   const [task, setTask] = useState('');
 
   const addTask = () => {
@@ -57,7 +57,12 @@ function TodoList() {
   );
 }
 function StockTracking() {
-  const [stocks, setStocks] = useState([]);
+  interface Stock {
+    name: string;
+    stock: number;
+  }
+
+  const [stocks, setStocks] = useState<Stock[]>([]);
 
   useEffect(() => {
     const fetchStocks = async () => {
@@ -86,7 +91,12 @@ function StockTracking() {
 }
 
 function Schedule() {
-  const [events, setEvents] = useState([]);
+  interface Event {
+    time: string;
+    activity: string;
+  }
+
+  const [events, setEvents] = useState<Event[]>([]);
 
   useEffect(() => {
     const fetchEvents = async () => {
