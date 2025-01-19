@@ -4,47 +4,50 @@ import {PrismaClient} from '@prisma/client';
 const prisma = new PrismaClient();
 
 export async function getTodayExperiments() {
-    const today = new Date();
-    const iso_today = today.toISOString();
+  const today = new Date();
 
-    const experiments = await prisma.experiments.findMany({
-        where: {
-            startDate: {
-                lte: iso_today,
-            },
-            endDate: {
-                gte: iso_today,
-            },
-        },
-        select: {
-            id: true,
-            startDate: true,
-            endDate: true,
-            title: true,
-            tasks: true,
-        },
-    });
+  // Prisma stores dates in UTC, so we need to use today's date to UTC
+  const startOfDayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 0, 0, 0));
+  const endOfDayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59));
 
-    return experiments.map((experiment) => ({
-        ...experiment,
-        id: experiment.id.toString(),
-    }))
+  const experiments = await prisma.experiments.findMany({
+    where: {
+      startDate: {
+        lte: endOfDayUtc,
+      },
+      endDate: {
+        gte: startOfDayUtc,
+      },
+    },
+    select: {
+      id: true,
+      startDate: true,
+      endDate: true,
+      title: true,
+      tasks: true,
+    },
+  });
+
+  return experiments.map((experiment) => ({
+    ...experiment,
+    id: experiment.id.toString(),
+  }));
 }
-
 export async function GET() {
-    try {
-        const today_experiment = await getTodayExperiments();
-        const today_experiment_json = await today_experiment
+  try {
+    const today_experiment_json = await getTodayExperiments();
 
-        console.log('Today\'s experiments:', today_experiment_json);
+    console.log("Today's experiments:", today_experiment_json);
 
-        const tasks = today_experiment_json.map((experiment: { tasks: string }) => experiment.tasks);
-        return NextResponse.json(tasks, {status: 200});
-    } catch (error) {
-        console.error('Error fetching experiments:', error);
-        return NextResponse.json(
-            {error: 'Failed to fetch experiments: ' + error.message},
-            {status: 500}
-        );
-    }
+    const tasks = today_experiment_json.map(
+        (experiment) => experiment.tasks
+        ).flat();
+    console.log('Tasks:', tasks);
+    return NextResponse.json(tasks, { status: 200 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to fetch experiments: ' + error.message },
+      { status: 500 }
+    );
+  }
 }

@@ -4,6 +4,7 @@ import {streamToString} from "next/dist/server/stream-utils/node-web-streams-hel
 
 const prisma = new PrismaClient();
 
+ 
 export async function GET() {
     try {
         const experiments = await prisma.experiments.findMany({
@@ -24,10 +25,11 @@ export async function GET() {
 // appointment system
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-    const data = await streamToString(request.body);
-    const {title, description, startDate, endDate} = JSON.parse(data);
 
-    if (!title || !description || !startDate || !endDate) {
+    const data = await streamToString(request.body);
+    const {title, description,tasks, startDate, endDate} = JSON.parse(data);
+
+    if (!title || !description || !tasks || !startDate || !endDate) {
         return NextResponse.json({error: 'Missing required fields'}, {status: 400});
     }
 
@@ -61,9 +63,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             data: {
                 title,
                 description,
-                startDate: start,
-                endDate: end,
+                tasks,
+                startDate: start.toISOString(),
+                endDate: end.toISOString(),
             },
+
         });
 
         const newExperimentWithStringId = {

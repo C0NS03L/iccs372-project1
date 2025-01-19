@@ -11,7 +11,7 @@ model Task {
   id            BigInt       @id @default(autoincrement())
   title         String
   description   String
-  completed     Boolean
+  completed     Boolean      @default(false)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   Experiment    Experiments? @relation(fields: [experimentsId], references: [id])
@@ -30,19 +30,7 @@ model Experiments {
   updatedAt                DateTime                   @updatedAt
   ExperimentEquipmentUsage ExperimentEquipmentUsage[]
   tasks                    Json
-  tasks_list               Task[]
-  Booking                  Booking[]
-}
-
-model Booking {
-  id           BigInt      @id @default(autoincrement())
-  experiment   Experiments @relation(fields: [experimentId], references: [id])
-  experimentId BigInt
-  date         DateTime
-  startTime    DateTime
-  endTime      DateTime
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  Task                     Task[]
 }
 
 model Inventory {
