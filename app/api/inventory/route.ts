@@ -12,7 +12,6 @@ export async function POST(request: NextRequest) {
       throw new Error('Request body is empty');
     }
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     const data = await streamToString(request.body);
     const {
       name,
