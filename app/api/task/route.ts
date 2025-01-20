@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         completed,
-        category: 'GENERAL'
+        category: 'GENERAL',
       },
     });
 

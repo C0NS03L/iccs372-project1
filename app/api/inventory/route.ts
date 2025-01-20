@@ -5,36 +5,14 @@ import { bigIntReplacer } from '../../lib/common';
 
 const prisma = new PrismaClient();
 
-export async function GET() {
-
-  try{
-    const inventory = await prisma.inventory.groupBy({
-      by: ['name'],
-      _count: {
-        name: true,
-      },
-    });
-    // format the inventory data to {name: string, stock: number}[]
-    const formattedInventory = inventory.map(
-      (item: { name: string; _count: { name: number } }) => ({
-        name: item.name,
-        stock: item._count.name,
-      })
-    );
-
-    return NextResponse.json(formattedInventory);
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch inventory' + error },
-      { status: 500 }
-    );
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
+    // Parse and validate input
+    if (!request.body) {
+      throw new Error('Request body is empty');
+    }
+
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
     const data = await streamToString(request.body);
     const {
       name,
@@ -45,6 +23,54 @@ export async function POST(request: NextRequest) {
       maintenanceTasks,
     } = JSON.parse(data);
 
+    // Validate required fields
+    if (!name || typeof name !== 'string') {
+      throw new Error('Invalid or missing "name" field');
+    }
+    if (!description || typeof description !== 'string') {
+      throw new Error('Invalid or missing "description" field');
+    }
+    if (available === undefined || typeof available !== 'boolean') {
+      throw new Error('Invalid or missing "available" field');
+    }
+    if (
+      stockLevel === undefined ||
+      typeof stockLevel !== 'number' ||
+      stockLevel < 0
+    ) {
+      throw new Error(
+        '"stockLevel" must be a non-negative number and is required'
+      );
+    }
+    if (
+      lowStockThreshold === undefined ||
+      typeof lowStockThreshold !== 'number' ||
+      lowStockThreshold < 0
+    ) {
+      throw new Error(
+        '"lowStockThreshold" must be a non-negative number and is required'
+      );
+    }
+
+    // Validate maintenanceTasks
+    if (!Array.isArray(maintenanceTasks)) {
+      throw new Error('Invalid or missing "maintenanceTasks" field');
+    }
+    maintenanceTasks.forEach((task, index) => {
+      if (
+        !task ||
+        typeof task.title !== 'string' ||
+        typeof task.description !== 'string' ||
+        typeof task.frequencyDays !== 'number' ||
+        task.frequencyDays <= 0
+      ) {
+        throw new Error(
+          `Invalid task at index ${index}: "title", "description", and "frequencyDays" are required, and "frequencyDays" must be greater than 0`
+        );
+      }
+    });
+
+    // Create new inventory item
     const newInventoryItem = await prisma.inventory.create({
       data: {
         name,
@@ -53,24 +79,20 @@ export async function POST(request: NextRequest) {
         stockLevel,
         lowStockThreshold,
         Task: {
-          create: maintenanceTasks.map(
-            (task: {
-              title: string;
-              description: string;
-              frequencyDays: number;
-            }) => ({
-              title: task.title,
-              description: task.description,
-              frequencyDays: task.frequencyDays,
-              dueDate: new Date(
-                Date.now() + task.frequencyDays * 24 * 60 * 60 * 1000
-              ),
-              category:'MAINTENANCE',
-            })
-          ),
+          create: maintenanceTasks.map((task) => ({
+            title: task.title,
+            description: task.description,
+            frequencyDays: task.frequencyDays,
+            dueDate: new Date(
+              Date.now() + task.frequencyDays * 24 * 60 * 60 * 1000
+            ),
+            category: 'MAINTENANCE',
+          })),
         },
       },
     });
+
+    // Format output to handle BigInt serialization
     const newInventoryItemWithStringId = JSON.parse(
       JSON.stringify(newInventoryItem, bigIntReplacer)
     );
@@ -79,6 +101,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(newInventoryItemWithStringId, { status: 201 });
   } catch (error) {
+    console.error('Error:', error.message);
     return NextResponse.json(
       { error: 'Failed to add inventory item: ' + error.message },
       { status: 500 }
