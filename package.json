@@ -15,7 +15,7 @@
   "dependencies": {
     "@prisma/client": "^6.2.1",
     "next": "^15.1.4",
-    "node-cron": "^3.0.3",
+    "next-intl": "^3.26.3",
     "prisma": "^6.2.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
