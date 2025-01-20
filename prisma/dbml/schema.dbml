@@ -9,11 +9,10 @@ Table Experiments {
   status ExperimentStatus [not null, default: 'PLANNED']
   startDate DateTime [not null]
   endDate DateTime [not null]
-  completed Boolean [not null, default: false]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
+  completed Boolean [not null, default: false]
   ExperimentEquipmentUsage ExperimentEquipmentUsage [not null]
-  tasks Json [not null]
   Task Task [not null]
 }
 
@@ -31,28 +30,14 @@ Table Inventory {
   id BigInt [pk, increment]
   name String [not null]
   description String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
   available Boolean [not null, default: true]
-  stockLevel Int [not null, default: 0]
   lowStockThreshold Int [not null, default: 5]
   nextMaintenanceDate DateTime
-  createdAt DateTime [default: `now()`, not null]
-  updatedAt DateTime [not null]
+  stockLevel Int [not null, default: 0]
   ExperimentEquipmentUsage ExperimentEquipmentUsage [not null]
-  MaintenanceTasks MaintenanceTask [not null]
   Task Task [not null]
-}
-
-Table MaintenanceTask {
-  id BigInt [pk, increment]
-  title String [not null]
-  description String [not null]
-  equipmentId BigInt [not null]
-  frequencyDays Int [not null]
-  lastPerformed DateTime
-  nextDueDate DateTime
-  createdAt DateTime [default: `now()`, not null]
-  updatedAt DateTime [not null]
-  Inventory Inventory [not null]
 }
 
 Table Task {
@@ -60,13 +45,22 @@ Table Task {
   title String [not null]
   description String [not null]
   completed Boolean [not null, default: false]
-  dueDate DateTime [not null]
+  dueDate DateTime
+  lastPerformed DateTime
   equipmentId BigInt
+  experimentsId BigInt
+  frequencyDays Int
+  category TaskCategory [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
   Inventory Inventory
   Experiments Experiments
-  experimentsId BigInt
+}
+
+Enum TaskCategory {
+  MAINTENANCE
+  EXPERIMENT
+  GENERAL
 }
 
 Enum ExperimentStatus {
@@ -79,8 +73,6 @@ Enum ExperimentStatus {
 Ref: ExperimentEquipmentUsage.equipmentId > Inventory.id
 
 Ref: ExperimentEquipmentUsage.experimentId > Experiments.id
-
-Ref: MaintenanceTask.equipmentId > Inventory.id
 
 Ref: Task.equipmentId > Inventory.id
 

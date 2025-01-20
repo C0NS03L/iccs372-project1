@@ -18,12 +18,10 @@ model Experiments {
   status                   ExperimentStatus           @default(PLANNED)
   startDate                DateTime
   endDate                  DateTime
-  completed                Boolean                    @default(false)
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
+  completed                Boolean                    @default(false)
   ExperimentEquipmentUsage ExperimentEquipmentUsage[]
-
-  tasks                    Json
   Task                     Task[]
 }
 
@@ -41,26 +39,14 @@ model Inventory {
   id                       BigInt                     @id @default(autoincrement())
   name                     String
   description              String
-  available                Boolean                    @default(true)
-  stockLevel               Int                        @default(0)
-  lowStockThreshold        Int                        @default(5)
-  nextMaintenanceDate      DateTime?
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
+  available                Boolean                    @default(true)
+  lowStockThreshold        Int                        @default(5)
+  nextMaintenanceDate      DateTime?
+  stockLevel               Int                        @default(0)
   ExperimentEquipmentUsage ExperimentEquipmentUsage[]
-}
-
-model MaintenanceTask {
-  id            BigInt    @id @default(autoincrement())
-  title         String
-  description   String
-  equipmentId   BigInt
-  frequencyDays Int // Frequency in days for repeating this task
-  lastPerformed DateTime? // Last time this task was performed
-  nextDueDate   DateTime? // Next scheduled due date
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  Inventory     Inventory @relation(fields: [equipmentId], references: [id])
+  Task                     Task[]
 }
 
 model Task {
@@ -68,13 +54,22 @@ model Task {
   title         String
   description   String
   completed     Boolean      @default(false)
-  dueDate       DateTime
+  dueDate       DateTime?
+  lastPerformed DateTime?
   equipmentId   BigInt? // Optional: Links to Inventory for maintenance-related tasks
+  experimentsId BigInt? // Optional: Links to Experiments for experiment-related tasks
+  frequencyDays Int? // Frequency in days for repeating this task, default to None for experiment tasks
+  category      TaskCategory // Category of the task (MAINTENANCE or EXPERIMENT)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   Inventory     Inventory?   @relation(fields: [equipmentId], references: [id])
   Experiments   Experiments? @relation(fields: [experimentsId], references: [id])
-  experimentsId BigInt?
+}
+
+enum TaskCategory {
+  MAINTENANCE
+  EXPERIMENT
+  GENERAL
 }
 
 enum ExperimentStatus {

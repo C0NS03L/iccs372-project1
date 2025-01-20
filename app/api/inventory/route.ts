@@ -6,10 +6,8 @@ import { bigIntReplacer } from '../../lib/common';
 const prisma = new PrismaClient();
 
 export async function GET() {
-  try {
-    // SELECT name, COUNT(*) as stock
-    // FROM "Inventory"
-    // GROUP BY name
+
+  try{
     const inventory = await prisma.inventory.groupBy({
       by: ['name'],
       _count: {
@@ -35,6 +33,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
     const data = await streamToString(request.body);
     const {
       name,
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         available,
         stockLevel,
         lowStockThreshold,
-        MaintenanceTasks: {
+        Task: {
           create: maintenanceTasks.map(
             (task: {
               title: string;
@@ -62,20 +62,20 @@ export async function POST(request: NextRequest) {
               title: task.title,
               description: task.description,
               frequencyDays: task.frequencyDays,
-              nextDueDate: new Date(
+              dueDate: new Date(
                 Date.now() + task.frequencyDays * 24 * 60 * 60 * 1000
-              ), // Calculate next due date
+              ),
+              category:'MAINTENANCE',
             })
           ),
         },
-      },
-      include: {
-        MaintenanceTasks: true,
       },
     });
     const newInventoryItemWithStringId = JSON.parse(
       JSON.stringify(newInventoryItem, bigIntReplacer)
     );
+
+    console.log(newInventoryItemWithStringId);
 
     return NextResponse.json(newInventoryItemWithStringId, { status: 201 });
   } catch (error) {
