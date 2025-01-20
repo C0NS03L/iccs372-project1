@@ -85,8 +85,11 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const updates: { completed?: boolean; lastPerformed?: Date; dueDate?: Date } =
-      { completed };
+    const updates: {
+      completed?: boolean;
+      lastPerformed?: Date;
+      dueDate?: Date;
+    } = { completed };
 
     if (task.category === 'MAINTENANCE' && completed) {
       const now = new Date();
