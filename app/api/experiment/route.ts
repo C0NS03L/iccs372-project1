@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { streamToString } from 'next/dist/server/stream-utils/node-web-streams-helper';
+import { bigIntReplacer } from '../../lib/common';
 
 const prisma = new PrismaClient();
 
@@ -25,9 +26,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const data = await streamToString(request.body);
-  const { title, description, tasks, startDate, endDate } = JSON.parse(data);
+  const { title, description, experimentTask, startDate, endDate } =
+    JSON.parse(data);
 
-  if (!title || !description || !tasks || !startDate || !endDate) {
+  if (!title || !description || !experimentTask || !startDate || !endDate) {
     return NextResponse.json(
       { error: 'Missing required fields' },
       { status: 400 }
@@ -70,17 +72,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       data: {
         title,
         description,
-        tasks,
         startDate: start.toISOString(),
         endDate: end.toISOString(),
+        Task: {
+          create: experimentTask.map(
+            (task: { title: string; description: string }) => ({
+              title: task.title,
+              description: task.description,
+              dueDate: startDate,
+              category: 'EXPERIMENT',
+            })
+          ),
+        },
       },
     });
-
-    const newExperimentWithStringId = {
-      ...newExperiment,
-      id: newExperiment.id.toString(),
-    };
-
+    // Convert BigInt fields to strings
+    const newExperimentWithStringId = JSON.parse(
+      JSON.stringify(newExperiment, bigIntReplacer)
+    );
     return NextResponse.json(newExperimentWithStringId, { status: 201 });
   } catch (error) {
     console.error(error);

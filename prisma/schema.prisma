@@ -2,20 +2,13 @@ generator client {
   provider = "prisma-client-js"
 }
 
+generator dbml {
+  provider = "prisma-dbml-generator"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-}
-
-model Task {
-  id            BigInt       @id @default(autoincrement())
-  title         String
-  description   String
-  completed     Boolean      @default(false)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  Experiment    Experiments? @relation(fields: [experimentsId], references: [id])
-  experimentsId BigInt
 }
 
 model Experiments {
@@ -25,22 +18,11 @@ model Experiments {
   status                   ExperimentStatus           @default(PLANNED)
   startDate                DateTime
   endDate                  DateTime
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
   completed                Boolean                    @default(false)
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
   ExperimentEquipmentUsage ExperimentEquipmentUsage[]
-  tasks                    Json
   Task                     Task[]
-}
-
-model Inventory {
-  id                       BigInt                     @id @default(autoincrement())
-  name                     String
-  description              String
-  avaiable                 Boolean
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
-  ExperimentEquipmentUsage ExperimentEquipmentUsage[]
 }
 
 model ExperimentEquipmentUsage {
@@ -51,6 +33,43 @@ model ExperimentEquipmentUsage {
   updatedAt    DateTime    @updatedAt
   equipment    Inventory   @relation(fields: [equipmentId], references: [id])
   experiment   Experiments @relation(fields: [experimentId], references: [id])
+}
+
+model Inventory {
+  id                       BigInt                     @id @default(autoincrement())
+  name                     String
+  description              String
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+  available                Boolean                    @default(true)
+  lowStockThreshold        Int                        @default(5)
+  nextMaintenanceDate      DateTime?
+  stockLevel               Int                        @default(0)
+  ExperimentEquipmentUsage ExperimentEquipmentUsage[]
+  Task                     Task[]
+}
+
+model Task {
+  id            BigInt       @id @default(autoincrement())
+  title         String
+  description   String
+  completed     Boolean      @default(false)
+  dueDate       DateTime?
+  lastPerformed DateTime?
+  equipmentId   BigInt? // Optional: Links to Inventory for maintenance-related tasks
+  experimentsId BigInt? // Optional: Links to Experiments for experiment-related tasks
+  frequencyDays Int? // Frequency in days for repeating this task, default to None for experiment tasks
+  category      TaskCategory // Category of the task (MAINTENANCE or EXPERIMENT)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  Inventory     Inventory?   @relation(fields: [equipmentId], references: [id])
+  Experiments   Experiments? @relation(fields: [experimentsId], references: [id])
+}
+
+enum TaskCategory {
+  MAINTENANCE
+  EXPERIMENT
+  GENERAL
 }
 
 enum ExperimentStatus {
