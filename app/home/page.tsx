@@ -4,6 +4,7 @@ import Head from 'next/head';
 import TodoList from './components/TodoList';
 import StockTracking from './components/StockTracking';
 import Schedule from './components/Schedule';
+import StockAlert from './components/StockAlert';
 
 export default function Home() {
   return (
@@ -15,6 +16,7 @@ export default function Home() {
         <TodoList />
         <StockTracking />
         <Schedule />
+        <StockAlert />
       </div>
     </div>
   );

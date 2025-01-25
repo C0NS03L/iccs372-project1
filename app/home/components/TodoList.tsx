@@ -15,7 +15,7 @@ export default function TodoList() {
   }, []);
 
   return (
-    <div className='col-span-2 row-span-1 rounded bg-gray-800 p-4 shadow'>
+    <div className='col-span-1 row-span-1 rounded bg-gray-800 p-4 shadow'>
       <h2 className='text-xl font-bold'>Todo List</h2>
       <div className='mt-2'>
         <ul className='mt-4'>

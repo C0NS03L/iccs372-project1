@@ -1,220 +1,187 @@
-// Schedule.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
-import { useEffect, useState } from 'react';
 
-interface Event {
-  time: string;
-  activity: string;
-}
+import { useState } from 'react';
+import BookExperimentModal from './BookExperimentModal'; // Import modal
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
 
-export default function Schedule() {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const [newEvent, setNewEvent] = useState({
+const MySwal = withReactContent(Swal);
+
+export const availableStock = [
+  { name: 'Item A', currentStock: 10 },
+  { name: 'Item B', currentStock: 5 },
+  { name: 'Item C', currentStock: 15 },
+];
+
+const Schedule = () => {
+  const [experiments, setExperiments] = useState<any[]>([]);
+  const [stockNeeded, setStockNeeded] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [newExperiment, setNewExperiment] = useState({
     title: '',
     description: '',
-    status: 'PLANNED',
-    startDate: '',
-    endDate: '',
-    tasks: [{ title: '', description: '' }],
+    room: 'Lab1',
+    startDate: new Date(),
+    endDate: new Date(),
   });
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      const response = await fetch('/api/experiment');
-      const experiments = await response.json();
-      const formattedExperiments = experiments.map(
-        (experiment: { startDate: string; title: string }) => ({
-          time: new Date(experiment.startDate).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          activity: experiment.title,
-        })
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingExperimentIndex, setEditingExperimentIndex] = useState<number | null>(null);
+
+  const handleStockChange = (index: number, value: number) => {
+    const updatedStock = [...stockNeeded];
+    updatedStock[index].quantity = value;
+    setStockNeeded(updatedStock);
+  };
+
+  const addStockItem = (stock: { name: string; currentStock: number }) => {
+    if (!stockNeeded.find((item) => item.name === stock.name)) {
+      setStockNeeded([...stockNeeded, { name: stock.name, quantity: 0 }]);
+    }
+  };
+
+  // Check for overlapping lab times
+  const checkLabTimeConflict = () => {
+    return experiments.some((experiment) => {
+      return (
+        experiment.room === newExperiment.room &&
+        ((newExperiment.startDate >= experiment.startDate && newExperiment.startDate < experiment.endDate) ||
+          (newExperiment.endDate > experiment.startDate && newExperiment.endDate <= experiment.endDate) ||
+          (newExperiment.startDate <= experiment.startDate && newExperiment.endDate >= experiment.endDate))
       );
-      setEvents(formattedExperiments);
-    };
-
-    fetchEvents();
-  }, []);
-
-  const handleTaskChange = (index: number, key: string, value: string) => {
-    const updatedTasks = [...newEvent.tasks];
-    updatedTasks[index] = { ...updatedTasks[index], [key]: value };
-    setNewEvent({ ...newEvent, tasks: updatedTasks });
-  };
-
-  const addTaskField = () => {
-    setNewEvent({
-      ...newEvent,
-      tasks: [...newEvent.tasks, { title: '', description: '' }],
     });
   };
 
-  const removeTaskField = (index: number) => {
-    const updatedTasks = newEvent.tasks.filter((_, i) => i !== index);
-    setNewEvent({ ...newEvent, tasks: updatedTasks });
-  };
-
-  const addExperiment = async () => {
-    const response = await fetch('/api/experiment', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(newEvent),
-    });
-
-    if (!response.ok) {
-      console.error('Failed to add experiment');
+  const createExperiment = () => {
+    if (!newExperiment.title.trim()) {
+      MySwal.fire({
+        title: 'Validation Error',
+        text: 'Experiment title is required.',
+        icon: 'error',
+        confirmButtonText: 'Ok',
+        customClass: {
+          popup: 'bg-gray-800 text-gray-200',
+        },
+      });
       return;
     }
 
-    const addedExperiment = await response.json();
-    setEvents((prevEvents) => [
-      ...prevEvents,
-      {
-        time: new Date(addedExperiment.startDate).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        activity: addedExperiment.title,
-      },
-    ]);
-    setIsPopupOpen(false);
-    setNewEvent({
+    if (checkLabTimeConflict()) {
+      MySwal.fire({
+        title: 'Time Conflict!',
+        text: `The selected time for this experiment conflicts with another experiment in ${newExperiment.room}. Please choose a different time.`,
+        icon: 'error',
+        confirmButtonText: 'Ok',
+        customClass: {
+          popup: 'bg-gray-800 text-gray-200',
+        },
+      });
+      return;
+    }
+
+    const missingStock = stockNeeded.filter(
+      (item) => item.quantity > (availableStock.find((stock) => stock.name === item.name)?.currentStock ?? 0)
+    );
+
+    if (missingStock.length > 0) {
+      const stockAlertItems = missingStock.map(
+        (item) => `- ${item.name}: Need ${item.quantity}`
+      ).join('<br>');
+
+      MySwal.fire({
+        title: 'Buy Stock Alert!',
+        html: `The following items are missing stock and need to be purchased:<br>${stockAlertItems}`,
+        icon: 'warning',
+        confirmButtonText: 'Add to Stock Alert',
+        customClass: {
+          popup: 'bg-gray-800 text-gray-200',
+        },
+      });
+    }
+
+    if (isEditing && editingExperimentIndex !== null) {
+      const updatedExperiments = [...experiments];
+      updatedExperiments[editingExperimentIndex] = { ...newExperiment, stockNeeded };
+      setExperiments(updatedExperiments);
+    } else {
+      setExperiments((prev) => [
+        ...prev,
+        {
+          ...newExperiment,
+          stockNeeded,
+        },
+      ]);
+    }
+
+    setStockNeeded([]);
+    setNewExperiment({
       title: '',
       description: '',
-      status: 'PLANNED',
-      startDate: '',
-      endDate: '',
-      tasks: [{ title: '', description: '' }],
+      room: 'Lab1',
+      startDate: new Date(),
+      endDate: new Date(),
     });
+    setIsEditing(false);
+    setIsModalOpen(false); // Close the modal after booking or editing the experiment
+  };
+
+  const editExperiment = (index: number) => {
+    setNewExperiment({
+      ...experiments[index],
+      startDate: new Date(experiments[index].startDate),
+      endDate: new Date(experiments[index].endDate),
+    });
+    setStockNeeded(experiments[index].stockNeeded);
+    setIsEditing(true);
+    setEditingExperimentIndex(index);
+    setIsModalOpen(true);
   };
 
   return (
     <div className='col-span-1 row-span-1 rounded bg-gray-800 p-4 shadow'>
-      <h2 className='text-xl font-bold'>Schedule</h2>
-      <button
-        onClick={() => setIsPopupOpen(true)}
-        className='mt-2 rounded bg-green-500 px-4 py-2 text-white'
-      >
-        Create New Experiment
-      </button>
+      <h2 className='text-xl font-bold'>Currently Booked Experiments</h2>
       <ul className='mt-4'>
-        {events.map((event, index) => (
+        {experiments.map((experiment, index) => (
           <li key={index} className='border-b border-gray-700 py-2'>
-            <span>
-              {event.time} - {event.activity}
-            </span>
+            <div>
+              {experiment.title} - {experiment.room}
+            </div>
+            <div className='text-sm text-gray-400'>
+              {experiment.startDate.toLocaleString()} - {experiment.endDate.toLocaleString()}
+            </div>
+            <button
+              onClick={() => editExperiment(index)}
+              className='mt-2 rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600'
+            >
+              Edit
+            </button>
           </li>
         ))}
       </ul>
+      <button
+        onClick={() => setIsModalOpen(true)}
+        className='mt-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600'
+      >
+        Book Experiment
+      </button>
 
-      {isPopupOpen && (
-        <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50'>
-          <div className='w-1/3 rounded bg-gray-800 p-4'>
-            <h2 className='text-lg font-bold text-white'>New Experiment</h2>
-            <input
-              type='text'
-              value={newEvent.title}
-              onChange={(e) =>
-                setNewEvent({ ...newEvent, title: e.target.value })
-              }
-              className='mt-2 w-full border border-gray-700 bg-gray-700 p-2 text-white'
-              placeholder='Title'
-            />
-            <textarea
-              value={newEvent.description}
-              onChange={(e) =>
-                setNewEvent({ ...newEvent, description: e.target.value })
-              }
-              className='mt-2 w-full border border-gray-700 bg-gray-700 p-2 text-white'
-              placeholder='Description'
-            />
-            <select
-              value={newEvent.status}
-              onChange={(e) =>
-                setNewEvent({ ...newEvent, status: e.target.value })
-              }
-              className='mt-2 w-full border border-gray-700 bg-gray-700 p-2 text-white'
-            >
-              <option value='PLANNED'>PLANNED</option>
-              <option value='IN_PROGRESS'>IN_PROGRESS</option>
-              <option value='COMPLETED'>COMPLETED</option>
-            </select>
-            <input
-              type='datetime-local'
-              value={newEvent.startDate}
-              onChange={(e) =>
-                setNewEvent({ ...newEvent, startDate: e.target.value })
-              }
-              className='mt-2 w-full border border-gray-700 bg-gray-700 p-2 text-white'
-              placeholder='Start Date'
-            />
-            <input
-              type='datetime-local'
-              value={newEvent.endDate}
-              onChange={(e) =>
-                setNewEvent({ ...newEvent, endDate: e.target.value })
-              }
-              className='mt-2 w-full border border-gray-700 bg-gray-700 p-2 text-white'
-              placeholder='End Date'
-            />
-            <div className='mt-4'>
-              <h3 className='text-white'>Tasks</h3>
-              {newEvent.tasks.map((task, index) => (
-                <div key={index} className='mt-2'>
-                  <input
-                    type='text'
-                    value={task.title}
-                    onChange={(e) =>
-                      handleTaskChange(index, 'title', e.target.value)
-                    }
-                    className='mr-2 w-1/2 border border-gray-700 bg-gray-700 p-2 text-white'
-                    placeholder='Task Title'
-                  />
-                  <input
-                    type='text'
-                    value={task.description}
-                    onChange={(e) =>
-                      handleTaskChange(index, 'description', e.target.value)
-                    }
-                    className='mr-2 w-1/2 border border-gray-700 bg-gray-700 p-2 text-white'
-                    placeholder='Task Description'
-                  />
-                  <button
-                    onClick={() => removeTaskField(index)}
-                    className='rounded bg-red-500 px-2 py-1 text-white'
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={addTaskField}
-                className='mt-2 rounded bg-blue-500 px-4 py-2 text-white'
-              >
-                Add Task
-              </button>
-            </div>
-            <div className='mt-4 flex justify-end'>
-              <button
-                onClick={() => setIsPopupOpen(false)}
-                className='mr-2 rounded bg-gray-600 px-4 py-2 text-white'
-              >
-                Cancel
-              </button>
-              <button
-                onClick={addExperiment}
-                className='rounded bg-blue-500 px-4 py-2 text-white'
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BookExperimentModal
+        isModalOpen={isModalOpen}
+        setIsModalOpen={setIsModalOpen}
+        newExperiment={newExperiment}
+        setNewExperiment={setNewExperiment}
+        stockNeeded={stockNeeded}
+        setStockNeeded={setStockNeeded}
+        createExperiment={createExperiment}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        handleStockChange={handleStockChange}
+        addStockItem={addStockItem}
+      />
     </div>
   );
-}
+};
+
+export default Schedule;
