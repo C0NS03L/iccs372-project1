@@ -21,9 +21,9 @@ const BookExperimentModal = ({
 }: any) => {
   return (
     isModalOpen && (
-      <div className='fixed inset-0 flex justify-center items-center bg-black bg-opacity-50'>
-        <div className='bg-gray-800 p-6 rounded shadow-lg w-128'>
-          <h3 className='text-xl font-bold mb-4'>Book a New Experiment</h3>
+      <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50'>
+        <div className='w-128 rounded bg-gray-800 p-6 shadow-lg'>
+          <h3 className='mb-4 text-xl font-bold'>Book a New Experiment</h3>
           <div>
             <input
               type='text'
@@ -32,22 +32,25 @@ const BookExperimentModal = ({
               onChange={(e) =>
                 setNewExperiment({ ...newExperiment, title: e.target.value })
               }
-              className='w-full mb-2 rounded border border-gray-700 bg-gray-700 p-2 text-white'
+              className='mb-2 w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
             />
             <textarea
               placeholder='Description'
               value={newExperiment.description}
               onChange={(e) =>
-                setNewExperiment({ ...newExperiment, description: e.target.value })
+                setNewExperiment({
+                  ...newExperiment,
+                  description: e.target.value,
+                })
               }
-              className='w-full mb-2 rounded border border-gray-700 bg-gray-700 p-2 text-white'
+              className='mb-2 w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
             />
             <select
               value={newExperiment.room}
               onChange={(e) =>
                 setNewExperiment({ ...newExperiment, room: e.target.value })
               }
-              className='w-full mb-2 rounded border border-gray-700 bg-gray-700 p-2 text-white'
+              className='mb-2 w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
             >
               <option value='Lab1'>Lab1</option>
               <option value='Lab2'>Lab2</option>
@@ -96,7 +99,9 @@ const BookExperimentModal = ({
                       key={index}
                       className='flex justify-between border-b border-gray-700 p-2'
                     >
-                      <span>{item.name} (In Stock: {item.currentStock})</span>
+                      <span>
+                        {item.name} (In Stock: {item.currentStock})
+                      </span>
                       <button
                         onClick={() => addStockItem(item)}
                         className='rounded bg-blue-500 px-2 py-1 text-white hover:bg-blue-600'
@@ -120,7 +125,9 @@ const BookExperimentModal = ({
                 <tbody>
                   {stockNeeded.map((item, index) => (
                     <tr key={index}>
-                      <td className='border-b border-gray-700 py-2'>{item.name}</td>
+                      <td className='border-b border-gray-700 py-2'>
+                        {item.name}
+                      </td>
                       <td className='border-b border-gray-700 py-2'>
                         <input
                           type='number'

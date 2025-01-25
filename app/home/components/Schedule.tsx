@@ -28,7 +28,9 @@ const Schedule = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingExperimentIndex, setEditingExperimentIndex] = useState<number | null>(null);
+  const [editingExperimentIndex, setEditingExperimentIndex] = useState<
+    number | null
+  >(null);
 
   const handleStockChange = (index: number, value: number) => {
     const updatedStock = [...stockNeeded];
@@ -47,9 +49,12 @@ const Schedule = () => {
     return experiments.some((experiment) => {
       return (
         experiment.room === newExperiment.room &&
-        ((newExperiment.startDate >= experiment.startDate && newExperiment.startDate < experiment.endDate) ||
-          (newExperiment.endDate > experiment.startDate && newExperiment.endDate <= experiment.endDate) ||
-          (newExperiment.startDate <= experiment.startDate && newExperiment.endDate >= experiment.endDate))
+        ((newExperiment.startDate >= experiment.startDate &&
+          newExperiment.startDate < experiment.endDate) ||
+          (newExperiment.endDate > experiment.startDate &&
+            newExperiment.endDate <= experiment.endDate) ||
+          (newExperiment.startDate <= experiment.startDate &&
+            newExperiment.endDate >= experiment.endDate))
       );
     });
   };
@@ -82,13 +87,16 @@ const Schedule = () => {
     }
 
     const missingStock = stockNeeded.filter(
-      (item) => item.quantity > (availableStock.find((stock) => stock.name === item.name)?.currentStock ?? 0)
+      (item) =>
+        item.quantity >
+        (availableStock.find((stock) => stock.name === item.name)
+          ?.currentStock ?? 0)
     );
 
     if (missingStock.length > 0) {
-      const stockAlertItems = missingStock.map(
-        (item) => `- ${item.name}: Need ${item.quantity}`
-      ).join('<br>');
+      const stockAlertItems = missingStock
+        .map((item) => `- ${item.name}: Need ${item.quantity}`)
+        .join('<br>');
 
       MySwal.fire({
         title: 'Buy Stock Alert!',
@@ -103,7 +111,10 @@ const Schedule = () => {
 
     if (isEditing && editingExperimentIndex !== null) {
       const updatedExperiments = [...experiments];
-      updatedExperiments[editingExperimentIndex] = { ...newExperiment, stockNeeded };
+      updatedExperiments[editingExperimentIndex] = {
+        ...newExperiment,
+        stockNeeded,
+      };
       setExperiments(updatedExperiments);
     } else {
       setExperiments((prev) => [
@@ -149,7 +160,8 @@ const Schedule = () => {
               {experiment.title} - {experiment.room}
             </div>
             <div className='text-sm text-gray-400'>
-              {experiment.startDate.toLocaleString()} - {experiment.endDate.toLocaleString()}
+              {experiment.startDate.toLocaleString()} -{' '}
+              {experiment.endDate.toLocaleString()}
             </div>
             <button
               onClick={() => editExperiment(index)}
