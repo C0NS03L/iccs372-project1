@@ -1,115 +1,13 @@
+// Schedule.tsx
 'use client';
-import Head from 'next/head';
 import { useEffect, useState } from 'react';
-// import { TaskAddRequest } from './api/task/route';
 
-export default function Home() {
-  return (
-    <div className='h-[100vh] bg-gray-900 text-gray-100'>
-      <Head>
-        <title>Dashboard</title>
-      </Head>
-      <div className='grid h-full grid-cols-2 grid-rows-2 gap-4 p-4'>
-        <TodoList />
-        <StockTracking />
-        <Schedule />
-      </div>
-    </div>
-  );
+interface Event {
+  time: string;
+  activity: string;
 }
 
-function TodoList() {
-  const [tasks, setTasks] = useState<string[]>([]);
-  // const [task, setTask] = useState('');
-
-  useEffect(() => {
-    const fetchTasks = async () => {
-      const response = await fetch('/api/task');
-      const tasks = await response.json();
-      console.log('Tasks:', tasks);
-      const taskTitles = tasks.map((task: { title: string }) => task.title);
-      setTasks(taskTitles);
-    };
-    fetchTasks();
-  }, []);
-
-  // const addTask = () => {
-  //   const addTaskToDB = async (task: TaskAddRequest) => {
-  //     const response = await fetch('/api/task', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify(task),
-  //     });
-
-  //     if (!response.ok) {
-  //       console.error('Failed to add task');
-  //       return;
-  //     }
-
-  //     const newTask = await response.json();
-  //     setTasks((prevTasks) => [...prevTasks, newTask.title]);
-  //     setTask('');
-  //   };
-  //   addTaskToDB({ title: task, description: '', completed: false });
-  // };
-
-  return (
-    <div className='col-span-2 row-span-1 rounded bg-gray-800 p-4 shadow'>
-      <h2 className='text-xl font-bold'>Todo List</h2>
-      <div className='mt-2'>
-        <ul className='mt-4'>
-          {tasks.map((t, index) => (
-            <li key={index} className='border-b border-gray-700 py-2'>
-              {t}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-function StockTracking() {
-  interface Stock {
-    name: string;
-    stock: number;
-  }
-
-  const [stocks, setStocks] = useState<Stock[]>([]);
-
-  useEffect(() => {
-    const fetchStocks = async () => {
-      const response = await fetch('/api/inventory');
-      const inventory = await response.json();
-      console.log('Inventory:' + inventory);
-      setStocks(inventory);
-    };
-    fetchStocks();
-  }, []);
-
-  return (
-    <div className='col-span-1 row-span-1 rounded bg-gray-800 p-4 shadow'>
-      <h2 className='text-xl font-bold'>Stock Tracking</h2>
-      <ul className='mt-4'>
-        {stocks.map((stock, index) => (
-          <li key={index} className='border-b border-gray-700 py-2'>
-            <span>
-              {stock.name} - {stock.stock}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function Schedule() {
-  interface Event {
-    time: string;
-    activity: string;
-  }
-
+export default function Schedule() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [newEvent, setNewEvent] = useState({
@@ -169,7 +67,6 @@ function Schedule() {
 
     if (!response.ok) {
       console.error('Failed to add experiment');
-      console.log(await response.json());
       return;
     }
 
