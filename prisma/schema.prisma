@@ -2,51 +2,42 @@ generator client {
   provider = "prisma-client-js"
 }
 
-generator dbml {
-  provider = "prisma-dbml-generator"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model Experiments {
-  id                       BigInt                     @id @default(autoincrement())
-  title                    String
-  description              String
-  status                   ExperimentStatus           @default(PLANNED)
-  startDate                DateTime
-  endDate                  DateTime
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
-  completed                Boolean                    @default(false)
-  ExperimentEquipmentUsage ExperimentEquipmentUsage[]
-  Task                     Task[]
-}
-
-model ExperimentEquipmentUsage {
-  id           BigInt      @id @default(autoincrement())
-  experimentId BigInt
-  equipmentId  BigInt
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  equipment    Inventory   @relation(fields: [equipmentId], references: [id])
-  experiment   Experiments @relation(fields: [experimentId], references: [id])
+  id          BigInt   @id @default(autoincrement())
+  title       String
+  description String
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  Tasks       Task[] // Associated experiment-related tasks
 }
 
 model Inventory {
-  id                       BigInt                     @id @default(autoincrement())
-  name                     String
-  description              String
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
-  available                Boolean                    @default(true)
-  lowStockThreshold        Int                        @default(5)
-  nextMaintenanceDate      DateTime?
-  stockLevel               Int                        @default(0)
-  ExperimentEquipmentUsage ExperimentEquipmentUsage[]
-  Task                     Task[]
+  id                BigInt    @id @default(autoincrement())
+  name              String
+  description       String
+  stockLevel        Int       @default(0) // Current stock level
+  lowStockThreshold Int       @default(5) // Threshold for triggering reorder
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  Reorders          Reorder[] // Reorder history
+}
+
+model Reorder {
+  id            BigInt    @id @default(autoincrement())
+  inventoryId   BigInt
+  inventoryName String
+  quantity      Int // Quantity to reorder
+  status        String    @default("PENDING") // Status of reorder (e.g., PENDING, COMPLETED)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  Inventory     Inventory @relation(fields: [inventoryId], references: [id])
 }
 
 model Task {
@@ -55,26 +46,15 @@ model Task {
   description   String
   completed     Boolean      @default(false)
   dueDate       DateTime?
-  lastPerformed DateTime?
-  equipmentId   BigInt? // Optional: Links to Inventory for maintenance-related tasks
-  experimentsId BigInt? // Optional: Links to Experiments for experiment-related tasks
-  frequencyDays Int? // Frequency in days for repeating this task, default to None for experiment tasks
-  category      TaskCategory // Category of the task (MAINTENANCE or EXPERIMENT)
+  category      TaskCategory // Type of task (e.g., EXPERIMENT or MAINTENANCE)
+  experimentsId BigInt? // Optional link to experiment
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
-  Inventory     Inventory?   @relation(fields: [equipmentId], references: [id])
   Experiments   Experiments? @relation(fields: [experimentsId], references: [id])
 }
 
 enum TaskCategory {
-  MAINTENANCE
   EXPERIMENT
+  MAINTENANCE
   GENERAL
-}
-
-enum ExperimentStatus {
-  PLANNED
-  ONGOING
-  COMPLETED
-  CANCELLED
 }

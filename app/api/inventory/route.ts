@@ -5,100 +5,58 @@ import { bigIntReplacer } from '../../lib/common';
 
 const prisma = new PrismaClient();
 
+export async function GET() {
+  try {
+    const experiments = await prisma.experiments.findMany({
+      select: {
+        startDate: true,
+        title: true,
+      },
+    });
+    return NextResponse.json(experiments, { status: 200 });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: 'Failed to fetch experiments' },
+      { status: 500 }
+    );
+  }
+}
+
+async function createInventoryItem(data: never) {
+  const { name, description, stockLevel, lowStockThreshold } = data;
+
+  return prisma.inventory.create({
+    data: {
+      name,
+      description,
+      stockLevel,
+      lowStockThreshold,
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // Parse and validate input
     if (!request.body) {
-      throw new Error('Request body is empty');
+      return NextResponse.json(
+        { error: 'Missing request body' },
+        { status: 400 }
+      );
     }
 
     const data = await streamToString(request.body);
-    const {
-      name,
-      description,
-      available,
-      stockLevel,
-      lowStockThreshold,
-      maintenanceTasks,
-    } = JSON.parse(data);
+    const parsedData = JSON.parse(data);
 
-    // Validate required fields
-    if (!name || typeof name !== 'string') {
-      throw new Error('Invalid or missing "name" field');
-    }
-    if (!description || typeof description !== 'string') {
-      throw new Error('Invalid or missing "description" field');
-    }
-    if (available === undefined || typeof available !== 'boolean') {
-      throw new Error('Invalid or missing "available" field');
-    }
-    if (
-      stockLevel === undefined ||
-      typeof stockLevel !== 'number' ||
-      stockLevel < 0
-    ) {
-      throw new Error(
-        '"stockLevel" must be a non-negative number and is required'
-      );
-    }
-    if (
-      lowStockThreshold === undefined ||
-      typeof lowStockThreshold !== 'number' ||
-      lowStockThreshold < 0
-    ) {
-      throw new Error(
-        '"lowStockThreshold" must be a non-negative number and is required'
-      );
-    }
+    const newInventoryItem = await createInventoryItem(parsedData);
 
-    // Validate maintenanceTasks
-    if (!Array.isArray(maintenanceTasks)) {
-      throw new Error('Invalid or missing "maintenanceTasks" field');
-    }
-    maintenanceTasks.forEach((task, index) => {
-      if (
-        !task ||
-        typeof task.title !== 'string' ||
-        typeof task.description !== 'string' ||
-        typeof task.frequencyDays !== 'number' ||
-        task.frequencyDays <= 0
-      ) {
-        throw new Error(
-          `Invalid task at index ${index}: "title", "description", and "frequencyDays" are required, and "frequencyDays" must be greater than 0`
-        );
-      }
-    });
-
-    // Create new inventory item
-    const newInventoryItem = await prisma.inventory.create({
-      data: {
-        name,
-        description,
-        available,
-        stockLevel,
-        lowStockThreshold,
-        Task: {
-          create: maintenanceTasks.map((task) => ({
-            title: task.title,
-            description: task.description,
-            frequencyDays: task.frequencyDays,
-            dueDate: new Date(
-              Date.now() + task.frequencyDays * 24 * 60 * 60 * 1000
-            ),
-            category: 'MAINTENANCE',
-          })),
-        },
-      },
-    });
-
-    // Format output to handle BigInt serialization
-    const newInventoryItemWithStringId = JSON.parse(
+    const response = JSON.parse(
       JSON.stringify(newInventoryItem, bigIntReplacer)
     );
 
-    console.log(newInventoryItemWithStringId);
+    console.log(response);
 
-    return NextResponse.json(newInventoryItemWithStringId, { status: 201 });
+    return NextResponse.json(response, { status: 201 });
   } catch (error) {
     console.error('Error:', error.message);
     return NextResponse.json(
