@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { bigIntReplacer } from '@/app/lib/common';
+import { toZonedTime } from 'date-fns-tz';
 
 const prisma = new PrismaClient();
 
@@ -15,7 +16,13 @@ interface ExperimentData {
 function validateExperimentData(data: ExperimentData) {
   const { title, description, startDate, endDate, items } = data;
 
-  if (!title || !description || !startDate || !endDate || !Array.isArray(items)) {
+  if (
+    !title ||
+    !description ||
+    !startDate ||
+    !endDate ||
+    !Array.isArray(items)
+  ) {
     throw new Error('Missing required fields or invalid format');
   }
 
@@ -86,12 +93,16 @@ async function processInventory(items: InventoryItem[]) {
         where: { id: inventory.id },
       });
 
-      if (updatedInventory && updatedInventory.stockLevel < updatedInventory.lowStockThreshold) {
+      if (
+        updatedInventory &&
+        updatedInventory.stockLevel < updatedInventory.lowStockThreshold
+      ) {
         await prisma.reorder.create({
           data: {
             inventoryId: updatedInventory.id,
             inventoryName: name,
-            quantity: updatedInventory.lowStockThreshold - updatedInventory.stockLevel,
+            quantity:
+              updatedInventory.lowStockThreshold - updatedInventory.stockLevel,
           },
         });
         console.log(`Reordered ${name} for ${updatedInventory.name}`);
@@ -133,9 +144,10 @@ async function updateExperimentStatus(experimentId: bigint, timezone: string) {
   }
 
   const now = new Date();
-  const zonedNow = utcToZonedTime(now, timezone);
-  const zonedStart = utcToZonedTime(experiment.startDate, timezone);
-  const zonedEnd = utcToZonedTime(experiment.endDate, timezone);
+  const zonedNow = toZonedTime(now, timezone);
+  const zonedStart = toZonedTime(experiment.startDate, timezone);
+  const zonedEnd = toZonedTime(experiment.endDate, timezone);
+
 
   let status = 'PENDING';
   if (zonedNow >= zonedStart && zonedNow <= zonedEnd) {
@@ -153,7 +165,8 @@ async function updateExperimentStatus(experimentId: bigint, timezone: string) {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const data: ExperimentData = await request.json();
-    const { title, description, start, end, items } = validateExperimentData(data);
+    const { title, description, start, end, items } =
+      validateExperimentData(data);
 
     await checkTimeslotConflicts(start, end);
     await processInventory(items);

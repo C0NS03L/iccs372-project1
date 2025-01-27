@@ -16,7 +16,13 @@ interface ExperimentData {
 function validateExperimentData(data: ExperimentData) {
   const { title, description, startDate, endDate, items } = data;
 
-  if (!title || !description || !startDate || !endDate || !Array.isArray(items)) {
+  if (
+    !title ||
+    !description ||
+    !startDate ||
+    !endDate ||
+    !Array.isArray(items)
+  ) {
     throw new Error('Missing required fields or invalid format');
   }
 
@@ -54,7 +60,7 @@ async function checkTimeslotConflicts(start: Date, end: Date) {
         error: 'Timeslot conflicts with existing experiment',
         alternativeSlots,
       },
-      { status: 409 },
+      { status: 409 }
     );
   }
 }
@@ -87,12 +93,16 @@ async function processInventory(items: InventoryItem[]) {
         where: { id: inventory.id },
       });
 
-      if (updatedInventory && updatedInventory.stockLevel < updatedInventory.lowStockThreshold) {
+      if (
+        updatedInventory &&
+        updatedInventory.stockLevel < updatedInventory.lowStockThreshold
+      ) {
         await prisma.reorder.create({
           data: {
             inventoryId: updatedInventory.id,
             inventoryName: name,
-            quantity: updatedInventory.lowStockThreshold - updatedInventory.stockLevel,
+            quantity:
+              updatedInventory.lowStockThreshold - updatedInventory.stockLevel,
           },
         });
         console.log(`Reordered ${name} for ${updatedInventory.name}`);
@@ -154,7 +164,8 @@ async function updateExperimentStatus(experimentId: bigint, timezone: string) {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const data: ExperimentData = await request.json();
-    const { title, description, start, end, items } = validateExperimentData(data);
+    const { title, description, start, end, items } =
+      validateExperimentData(data);
 
     await checkTimeslotConflicts(start, end);
     await processInventory(items);
@@ -184,14 +195,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               alternativeSlots: customError.alternativeSlots,
             }),
           },
-          { status: customError.status },
+          { status: customError.status }
         );
       }
     }
 
     return NextResponse.json(
       { error: 'Failed to process request: ' + (error as Error).message },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -210,7 +221,7 @@ export async function GET() {
     console.error(error);
     return NextResponse.json(
       { error: 'Failed to fetch experiments' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
