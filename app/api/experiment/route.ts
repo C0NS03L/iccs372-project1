@@ -148,7 +148,6 @@ async function updateExperimentStatus(experimentId: bigint, timezone: string) {
   const zonedStart = toZonedTime(experiment.startDate, timezone);
   const zonedEnd = toZonedTime(experiment.endDate, timezone);
 
-
   let status = 'PENDING';
   if (zonedNow >= zonedStart && zonedNow <= zonedEnd) {
     status = 'ONGOING';
