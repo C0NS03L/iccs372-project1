@@ -69,8 +69,10 @@ interface InventoryItem {
   name: string;
   quantity: number;
 }
+async function processInventory(items: InventoryItem[], experimentStartDate: Date) {
+  const arrivalDate = new Date(experimentStartDate);
+  arrivalDate.setDate(arrivalDate.getDate() - 3);
 
-async function processInventory(items: InventoryItem[]) {
   for (const { name, quantity } of items) {
     const inventoryItems = await prisma.inventory.findMany({
       where: { name },
@@ -103,6 +105,7 @@ async function processInventory(items: InventoryItem[]) {
             inventoryName: name,
             quantity:
               updatedInventory.lowStockThreshold - updatedInventory.stockLevel,
+            arrivalDate,
           },
         });
         console.log(`Reordered ${name} for ${updatedInventory.name}`);
@@ -123,11 +126,13 @@ async function processInventory(items: InventoryItem[]) {
           inventoryId: inventory.id,
           inventoryName: name,
           quantity: remainingQuantity,
+          arrivalDate,
         },
       });
     }
   }
 }
+
 
 interface CustomError extends Error {
   status?: number;
@@ -229,7 +234,6 @@ export async function GET() {
 
 export async function PUT(request: NextRequest): Promise<NextResponse> {
   try {
-
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const data = await request.json();
@@ -241,22 +245,19 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const experimentId = BigInt(id); // Convert ID to BigInt for Prisma
+    const experimentId = BigInt(id);
 
-    // Validate the new data
-    const { title, description, start, end, items } = validateExperimentData(data);
+    const { title, description, start, end, items } =
+      validateExperimentData(data);
 
-    // Check for timeslot conflicts if start or end dates are updated
     if (start || end) {
       await checkTimeslotConflicts(start, end);
     }
 
-    // Update inventory if items are provided
     if (items && items.length > 0) {
-      await processInventory(items); // Ensure stock levels are adjusted
+      await processInventory(items);
     }
 
-    // Update the experiment in the database
     const updatedExperiment = await prisma.experiments.update({
       where: { id: experimentId },
       data: {
@@ -267,7 +268,6 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Update the experiment status based on its new time window
     await updateExperimentStatus(updatedExperiment.id, 'UTC');
 
     const response = JSON.parse(

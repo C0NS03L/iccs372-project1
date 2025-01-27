@@ -34,8 +34,9 @@ model Reorder {
   id            BigInt    @id @default(autoincrement())
   inventoryId   BigInt
   inventoryName String
-  quantity      Int // Quantity to reorder
-  status        String    @default("PENDING") // Status of reorder (e.g., PENDING, COMPLETED)
+  quantity      Int
+  status        String    @default("PENDING")
+  arrivalDate   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   Inventory     Inventory @relation(fields: [inventoryId], references: [id])
@@ -47,8 +48,8 @@ model Task {
   description   String
   completed     Boolean      @default(false)
   dueDate       DateTime?
-  category      TaskCategory // Type of task (e.g., EXPERIMENT or MAINTENANCE)
-  experimentsId BigInt? // Optional link to experiment
+  category      TaskCategory
+  experimentsId BigInt?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   Experiments   Experiments? @relation(fields: [experimentsId], references: [id])
