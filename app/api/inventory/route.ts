@@ -16,10 +16,15 @@ export async function POST(request: NextRequest) {
     const data: InventoryItem = await request.json();
     const { name, description, stockLevel, lowStockThreshold } = data;
 
-    if (!name || !description || stockLevel === undefined || lowStockThreshold === undefined) {
+    if (
+      !name ||
+      !description ||
+      stockLevel === undefined ||
+      lowStockThreshold === undefined
+    ) {
       return NextResponse.json(
         { error: 'Missing required fields' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -33,18 +38,17 @@ export async function POST(request: NextRequest) {
     });
 
     const newInventoryWithStringId = JSON.parse(
-      JSON.stringify(newInventory, bigIntReplacer),
+      JSON.stringify(newInventory, bigIntReplacer)
     );
     return NextResponse.json(newInventoryWithStringId, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
       { error: 'Failed to create inventory item' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
-
 
 export async function GET() {
   try {
@@ -58,7 +62,7 @@ export async function GET() {
     });
 
     const inventoryWithStringId = inventory.map((item) =>
-      JSON.parse(JSON.stringify(item, bigIntReplacer)),
+      JSON.parse(JSON.stringify(item, bigIntReplacer))
     );
 
     return NextResponse.json(inventoryWithStringId, { status: 200 });
@@ -66,7 +70,7 @@ export async function GET() {
     console.error(error);
     return NextResponse.json(
       { error: 'Failed to fetch inventory items' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -80,7 +84,7 @@ export async function PUT(request: NextRequest) {
     if (!id || stockLevel === undefined) {
       return NextResponse.json(
         { error: 'Missing required fields' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -90,7 +94,7 @@ export async function PUT(request: NextRequest) {
     });
 
     const updatedInventoryWithStringId = JSON.parse(
-      JSON.stringify(updatedInventory, bigIntReplacer),
+      JSON.stringify(updatedInventory, bigIntReplacer)
     );
 
     return NextResponse.json(updatedInventoryWithStringId, { status: 200 });
@@ -98,10 +102,7 @@ export async function PUT(request: NextRequest) {
     console.error(error);
     return NextResponse.json(
       { error: 'Failed to update inventory item' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
-
-
-

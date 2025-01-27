@@ -226,3 +226,60 @@ export async function GET() {
     );
   }
 }
+
+export async function PUT(request: NextRequest): Promise<NextResponse> {
+  try {
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    const data = await request.json();
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Experiment ID is required' },
+        { status: 400 },
+      );
+    }
+
+    const experimentId = BigInt(id); // Convert ID to BigInt for Prisma
+
+    // Validate the new data
+    const { title, description, start, end, items } = validateExperimentData(data);
+
+    // Check for timeslot conflicts if start or end dates are updated
+    if (start || end) {
+      await checkTimeslotConflicts(start, end);
+    }
+
+    // Update inventory if items are provided
+    if (items && items.length > 0) {
+      await processInventory(items); // Ensure stock levels are adjusted
+    }
+
+    // Update the experiment in the database
+    const updatedExperiment = await prisma.experiments.update({
+      where: { id: experimentId },
+      data: {
+        ...(title && { title }),
+        ...(description && { description }),
+        ...(start && { startDate: start.toISOString() }),
+        ...(end && { endDate: end.toISOString() }),
+      },
+    });
+
+    // Update the experiment status based on its new time window
+    await updateExperimentStatus(updatedExperiment.id, 'UTC');
+
+    const response = JSON.parse(
+      JSON.stringify(updatedExperiment, bigIntReplacer),
+    );
+
+    return NextResponse.json(response, { status: 200 });
+  } catch (error: unknown) {
+    console.error(error);
+    return NextResponse.json(
+      { error: 'Failed to update experiment: ' + (error as Error).message },
+      { status: 500 },
+    );
+  }
+}
