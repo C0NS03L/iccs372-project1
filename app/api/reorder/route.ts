@@ -56,7 +56,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-
 export async function PUT(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);

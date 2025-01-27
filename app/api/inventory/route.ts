@@ -6,9 +6,9 @@ const prisma = new PrismaClient();
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    const { inventoryId, inventoryName, quantity} = data;
+    const { inventoryId, inventoryName, quantity } = data;
 
-    if (!inventoryId || !inventoryName || !quantity  ) {
+    if (!inventoryId || !inventoryName || !quantity) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

@@ -60,7 +60,7 @@ async function checkTimeslotConflicts(start: Date, end: Date) {
         error: 'Timeslot conflicts with existing experiment',
         alternativeSlots,
       },
-      { status: 409 },
+      { status: 409 }
     );
   }
 }
@@ -69,7 +69,10 @@ interface InventoryItem {
   name: string;
   quantity: number;
 }
-async function processInventory(items: InventoryItem[], experimentStartDate: Date) {
+async function processInventory(
+  items: InventoryItem[],
+  experimentStartDate: Date
+) {
   const arrivalDate = new Date(experimentStartDate);
   arrivalDate.setDate(arrivalDate.getDate() - 3);
 
@@ -132,7 +135,6 @@ async function processInventory(items: InventoryItem[], experimentStartDate: Dat
     }
   }
 }
-
 
 interface CustomError extends Error {
   status?: number;
@@ -200,14 +202,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               alternativeSlots: customError.alternativeSlots,
             }),
           },
-          { status: customError.status },
+          { status: customError.status }
         );
       }
     }
 
     return NextResponse.json(
       { error: 'Failed to process request: ' + (error as Error).message },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -227,7 +229,7 @@ export async function GET() {
     console.error(error);
     return NextResponse.json(
       { error: 'Failed to fetch experiments' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -241,7 +243,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     if (!id) {
       return NextResponse.json(
         { error: 'Experiment ID is required' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -271,7 +273,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     await updateExperimentStatus(updatedExperiment.id, 'UTC');
 
     const response = JSON.parse(
-      JSON.stringify(updatedExperiment, bigIntReplacer),
+      JSON.stringify(updatedExperiment, bigIntReplacer)
     );
 
     return NextResponse.json(response, { status: 200 });
@@ -279,7 +281,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     console.error(error);
     return NextResponse.json(
       { error: 'Failed to update experiment: ' + (error as Error).message },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
