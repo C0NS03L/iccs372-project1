@@ -15,13 +15,7 @@ interface ExperimentData {
 function validateExperimentData(data: ExperimentData) {
   const { title, description, startDate, endDate, items } = data;
 
-  if (
-    !title ||
-    !description ||
-    !startDate ||
-    !endDate ||
-    !Array.isArray(items)
-  ) {
+  if (!title || !description || !startDate || !endDate || !Array.isArray(items)) {
     throw new Error('Missing required fields or invalid format');
   }
 
@@ -35,9 +29,6 @@ function validateExperimentData(data: ExperimentData) {
   return { title, description, start, end, items };
 }
 
-/**
- * Checks for timeslot conflicts and suggests alternative slots if conflicts exist.
- */
 async function checkTimeslotConflicts(start: Date, end: Date) {
   const conflict = await prisma.experiments.findFirst({
     where: {
@@ -62,7 +53,7 @@ async function checkTimeslotConflicts(start: Date, end: Date) {
         error: 'Timeslot conflicts with existing experiment',
         alternativeSlots,
       },
-      { status: 409 }
+      { status: 409 },
     );
   }
 }
@@ -91,21 +82,16 @@ async function processInventory(items: InventoryItem[]) {
       });
       console.log(`Allocated ${allocated} of ${name} from ${inventory.name}`);
 
-      // Check if stock level falls below the low stock threshold
       const updatedInventory = await prisma.inventory.findUnique({
         where: { id: inventory.id },
       });
 
-      if (
-        updatedInventory &&
-        updatedInventory.stockLevel < updatedInventory.lowStockThreshold
-      ) {
+      if (updatedInventory && updatedInventory.stockLevel < updatedInventory.lowStockThreshold) {
         await prisma.reorder.create({
           data: {
             inventoryId: updatedInventory.id,
             inventoryName: name,
-            quantity:
-              updatedInventory.lowStockThreshold - updatedInventory.stockLevel,
+            quantity: updatedInventory.lowStockThreshold - updatedInventory.stockLevel,
           },
         });
         console.log(`Reordered ${name} for ${updatedInventory.name}`);
@@ -137,11 +123,37 @@ interface CustomError extends Error {
   alternativeSlots?: never[];
 }
 
+async function updateExperimentStatus(experimentId: bigint, timezone: string) {
+  const experiment = await prisma.experiments.findUnique({
+    where: { id: experimentId },
+  });
+
+  if (!experiment) {
+    throw new Error('Experiment not found');
+  }
+
+  const now = new Date();
+  const zonedNow = utcToZonedTime(now, timezone);
+  const zonedStart = utcToZonedTime(experiment.startDate, timezone);
+  const zonedEnd = utcToZonedTime(experiment.endDate, timezone);
+
+  let status = 'PENDING';
+  if (zonedNow >= zonedStart && zonedNow <= zonedEnd) {
+    status = 'ONGOING';
+  } else if (zonedNow > zonedEnd) {
+    status = 'COMPLETED';
+  }
+
+  await prisma.experiments.update({
+    where: { id: experimentId },
+    data: { status },
+  });
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const data: ExperimentData = await request.json();
-    const { title, description, start, end, items } =
-      validateExperimentData(data);
+    const { title, description, start, end, items } = validateExperimentData(data);
 
     await checkTimeslotConflicts(start, end);
     await processInventory(items);
@@ -154,6 +166,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         endDate: end.toISOString(),
       },
     });
+
+    await updateExperimentStatus(newExperiment.id, 'UTC'); // Update status based on timezone
 
     const response = JSON.parse(JSON.stringify(newExperiment, bigIntReplacer));
 
@@ -169,14 +183,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               alternativeSlots: customError.alternativeSlots,
             }),
           },
-          { status: customError.status }
+          { status: customError.status },
         );
       }
     }
 
     return NextResponse.json(
       { error: 'Failed to process request: ' + (error as Error).message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -187,6 +201,8 @@ export async function GET() {
       select: {
         startDate: true,
         title: true,
+        description: true,
+        status: true,
       },
     });
     return NextResponse.json(experiments, { status: 200 });
@@ -194,7 +210,7 @@ export async function GET() {
     console.error(error);
     return NextResponse.json(
       { error: 'Failed to fetch experiments' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

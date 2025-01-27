@@ -13,6 +13,7 @@ model Experiments {
   description String
   startDate   DateTime
   endDate     DateTime
+  status      String   @default("PENDING") // New field for status
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   Tasks       Task[] // Associated experiment-related tasks
