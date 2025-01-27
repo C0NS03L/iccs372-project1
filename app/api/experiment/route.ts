@@ -132,11 +132,15 @@ async function processInventory(items: InventoryItem[]) {
   }
 }
 
+interface CustomError extends Error {
+  status?: number;
+  alternativeSlots?: never[];
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const data: ExperimentData = await request.json();
-    const { title, description, start, end, items } =
-      validateExperimentData(data);
+    const { title, description, start, end, items } = validateExperimentData(data);
 
     await checkTimeslotConflicts(start, end);
     await processInventory(items);
@@ -154,16 +158,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(response, { status: 201 });
   } catch (error: unknown) {
-    if (error instanceof Error && 'status' in error) {
-      return NextResponse.json(
-        {
-          error: error.message,
-          ...(error.alternativeSlots && {
-            alternativeSlots: error.alternativeSlots,
-          }),
-        },
-        { status: (error as never).status }
-      );
+    if (error instanceof Error) {
+      const customError = error as CustomError;
+      if (customError.status) {
+        return NextResponse.json(
+          {
+            error: customError.message,
+            ...(customError.alternativeSlots && {
+              alternativeSlots: customError.alternativeSlots,
+            }),
+          },
+          { status: customError.status }
+        );
+      }
     }
 
     return NextResponse.json(
@@ -172,7 +179,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 }
-
 /**
  * GET handler for fetching experiments.
  */
