@@ -7,21 +7,29 @@ const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    const experiments = await prisma.experiments.findMany({
+    const inventoryItems = await prisma.inventory.findMany({
       select: {
-        startDate: true,
-        title: true,
+        id: true,
+        name: true,
+        description: true,
+        stockLevel: true,
+        lowStockThreshold: true,
       },
     });
-    return NextResponse.json(experiments, { status: 200 });
+
+    const response = JSON.parse(
+      JSON.stringify(inventoryItems, bigIntReplacer)
+    );
+
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
-    console.error(error);
     return NextResponse.json(
-      { error: 'Failed to fetch experiments' },
+      { error: 'Failed to fetch inventory items: ' + error.message },
       { status: 500 }
     );
   }
 }
+
 
 async function createInventoryItem(data: never) {
   const { name, description, stockLevel, lowStockThreshold } = data;

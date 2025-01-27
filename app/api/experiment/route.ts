@@ -140,7 +140,8 @@ interface CustomError extends Error {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const data: ExperimentData = await request.json();
-    const { title, description, start, end, items } = validateExperimentData(data);
+    const { title, description, start, end, items } =
+      validateExperimentData(data);
 
     await checkTimeslotConflicts(start, end);
     await processInventory(items);
@@ -179,9 +180,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 }
-/**
- * GET handler for fetching experiments.
- */
+
 export async function GET() {
   try {
     const experiments = await prisma.experiments.findMany({
