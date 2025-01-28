@@ -31,10 +31,6 @@ export async function POST(request: NextRequest) {
     const data = await streamToString(request.body);
     const { title, description, completed }: TaskAddRequest = JSON.parse(data);
 
-    // console.log('Title: ' + title);
-    // console.log('Description: ' + description);
-    // console.log('Completed: ' + completed);
-
     const newTask = await prisma.task.create({
       data: {
         title,

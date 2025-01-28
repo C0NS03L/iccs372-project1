@@ -91,20 +91,7 @@ export async function PATCH(request: NextRequest) {
       dueDate?: Date;
     } = { completed };
 
-    if (task.category === 'MAINTENANCE' && completed) {
-      const now = new Date();
-      updates.lastPerformed = now;
-      if (typeof task.frequencyDays === 'number' && task.frequencyDays > 0) {
-        const currentDueDate = new Date(task.dueDate);
-        console.log('Current due date:', currentDueDate);
-        const futureDueDate = new Date(currentDueDate);
-        futureDueDate.setDate(currentDueDate.getDate() + task.frequencyDays);
-        updates.dueDate = futureDueDate;
-        console.log('Updated due date to:', futureDueDate);
-      } else {
-        console.log('frequencyDays is not defined or invalid');
-      }
-    }
+    console.log("Today's experiments:", today_experiment_json);
 
     const updatedTask = await prisma.task.update({
       where: { id: BigInt(taskId) },
