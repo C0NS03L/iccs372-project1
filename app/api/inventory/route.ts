@@ -1,34 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { bigIntReplacer } from '@/app/lib/common';
 
 const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    const { inventoryId, inventoryName, quantity } = data;
+    const { name, description, stockLevel, lowStockThreshold } = data;
 
-    if (!inventoryId || !inventoryName || !quantity) {
+    if (!name || !description || stockLevel === undefined || lowStockThreshold === undefined) {
       return NextResponse.json(
         { error: 'Missing required fields' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const newReorder = await prisma.reorder.create({
+    const newInventory = await prisma.inventory.create({
       data: {
-        inventoryId,
-        inventoryName,
-        quantity,
+        name,
+        description,
+        stockLevel,
+        lowStockThreshold,
       },
     });
 
-    return NextResponse.json(newReorder, { status: 201 });
+    // use bigIntReplacer to convert BigInt fields to strings
+    const newInventoryStringId = JSON.parse(
+      JSON.stringify(newInventory, bigIntReplacer),
+    );
+
+
+    return NextResponse.json(newInventoryStringId, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: 'Failed to create reorder' },
-      { status: 500 }
+      { error: 'Failed to create inventory' },
+      { status: 500 },
+    );
+  }
+}
+
+export async function GET() {
+  try {
+    const inventoryItems = await prisma.inventory.findMany();
+    const newInventoryItems = JSON.parse(
+      JSON.stringify(inventoryItems, bigIntReplacer),
+    );
+
+    return NextResponse.json(newInventoryItems, { status: 200 });
+  } catch (error) {
+    console.error(error);
+
+    return NextResponse.json(
+      { error: 'Failed to fetch inventory items' },
+      { status: 500 },
     );
   }
 }
@@ -37,45 +63,33 @@ export async function PUT(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const { status, arrivalDate } = await request.json();
+    const data = await request.json();
 
-    if (!id || !status) {
+    if (!id) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+        { error: 'Inventory ID is required' },
+        { status: 400 },
       );
     }
 
-    const reorderId = BigInt(id);
+    const inventoryId = BigInt(id);
 
-    const updatedReorder = await prisma.reorder.update({
-      where: { id: reorderId },
-      data: {
-        status,
-        ...(arrivalDate && { arrivalDate: new Date(arrivalDate) }),
-      },
+    const updatedInventory = await prisma.inventory.update({
+      where: { id: inventoryId },
+      data,
     });
 
-    if (status === 'COMPLETED') {
-      const reorder = await prisma.reorder.findUnique({
-        where: { id: reorderId },
-        include: { Inventory: true },
-      });
+    const updatedInventoryStringId = JSON.parse(
+      JSON.stringify(updatedInventory, bigIntReplacer),
+    );
 
-      if (reorder) {
-        await prisma.inventory.update({
-          where: { id: reorder.inventoryId },
-          data: { stockLevel: { increment: reorder.quantity } },
-        });
-      }
-    }
 
-    return NextResponse.json(updatedReorder, { status: 200 });
+    return NextResponse.json(updatedInventoryStringId, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: 'Failed to update reorder' },
-      { status: 500 }
+      { error: 'Failed to update inventory' },
+      { status: 500 },
     );
   }
 }
