@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!query_date) {
     return NextResponse.json(
       { error: 'query_date parameter is required' },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
       date.getUTCDate(),
       0,
       0,
-      0,
-    ),
+      0
+    )
   );
   const endOfDayUtc = new Date(
     Date.UTC(
@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
       date.getUTCDate(),
       23,
       59,
-      59,
-    ),
+      59
+    )
   );
 
   try {
@@ -53,14 +53,14 @@ export async function GET(request: NextRequest) {
     });
 
     const tasksWithIdAsString = JSON.parse(
-      JSON.stringify(tasks, bigIntReplacer),
+      JSON.stringify(tasks, bigIntReplacer)
     );
 
     return NextResponse.json(tasksWithIdAsString, { status: 200 });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to fetch tasks: ' + error.message },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -73,7 +73,7 @@ export async function PATCH(request: NextRequest) {
     if (!taskId || typeof completed !== 'boolean') {
       return NextResponse.json(
         { error: 'Invalid or missing taskId or completed status' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -91,20 +91,7 @@ export async function PATCH(request: NextRequest) {
       dueDate?: Date;
     } = { completed };
 
-    if (task.category === 'MAINTENANCE' && completed) {
-      const now = new Date();
-      updates.lastPerformed = now;
-      if (typeof task.frequencyDays === 'number' && task.frequencyDays > 0) {
-        const currentDueDate = new Date(task.dueDate);
-        console.log('Current due date:', currentDueDate);
-        const futureDueDate = new Date(currentDueDate);
-        futureDueDate.setDate(currentDueDate.getDate() + task.frequencyDays);
-        updates.dueDate = futureDueDate;
-        console.log('Updated due date to:', futureDueDate);
-      } else {
-        console.log('frequencyDays is not defined or invalid');
-      }
-    }
+    console.log("Today's experiments:", today_experiment_json);
 
     const updatedTask = await prisma.task.update({
       where: { id: BigInt(taskId) },
@@ -112,14 +99,14 @@ export async function PATCH(request: NextRequest) {
     });
 
     const updatedTaskWithStringId = JSON.parse(
-      JSON.stringify(updatedTask, bigIntReplacer),
+      JSON.stringify(updatedTask, bigIntReplacer)
     );
 
     return NextResponse.json(updatedTaskWithStringId, { status: 200 });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to update task: ' + (error as Error).message },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

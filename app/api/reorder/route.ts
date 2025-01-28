@@ -3,6 +3,25 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+export async function GET() {
+  try {
+    const reorders = await prisma.reorder.findMany({
+      select: {
+        inventoryName: true,
+        quantity: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+    return NextResponse.json(reorders, { status: 200 });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: 'Failed to fetch reorders' },
+      { status: 500 }
+    );
+  }
+}
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
@@ -15,11 +34,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const arrivalDate = new Date();
+    arrivalDate.setDate(arrivalDate.getDate() + 3);
+
     const newReorder = await prisma.reorder.create({
       data: {
         inventoryId,
         inventoryName,
         quantity,
+        arrivalDate,
       },
     });
 
@@ -37,11 +60,11 @@ export async function PUT(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const { status, arrivalDate } = await request.json();
+    const data = await request.json();
 
-    if (!id || !status) {
+    if (!id) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Reorder ID is required' },
         { status: 400 }
       );
     }
@@ -50,25 +73,8 @@ export async function PUT(request: NextRequest) {
 
     const updatedReorder = await prisma.reorder.update({
       where: { id: reorderId },
-      data: {
-        status,
-        ...(arrivalDate && { arrivalDate: new Date(arrivalDate) }),
-      },
+      data,
     });
-
-    if (status === 'COMPLETED') {
-      const reorder = await prisma.reorder.findUnique({
-        where: { id: reorderId },
-        include: { Inventory: true },
-      });
-
-      if (reorder) {
-        await prisma.inventory.update({
-          where: { id: reorder.inventoryId },
-          data: { stockLevel: { increment: reorder.quantity } },
-        });
-      }
-    }
 
     return NextResponse.json(updatedReorder, { status: 200 });
   } catch (error) {
