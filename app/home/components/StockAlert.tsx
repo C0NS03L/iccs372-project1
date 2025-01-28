@@ -100,7 +100,8 @@ export default function StockAlert() {
     } catch (err) {
       Swal.fire({
         title: 'Error!',
-        text: err instanceof Error ? err.message : 'Failed to update stock alert',
+        text:
+          err instanceof Error ? err.message : 'Failed to update stock alert',
         icon: 'error',
         customClass: {
           popup: 'bg-gray-800 text-gray-200',
@@ -138,8 +139,8 @@ export default function StockAlert() {
             >
               <div className='flex items-center justify-between'>
                 <span>
-                  <strong>{alert.inventoryName}</strong>: Buy {alert.quantity} by{' '}
-                  {new Date(alert.arrivalDate).toLocaleDateString()}
+                  <strong>{alert.inventoryName}</strong>: Buy {alert.quantity}{' '}
+                  by {new Date(alert.arrivalDate).toLocaleDateString()}
                 </span>
                 {alert.status !== 'COMPLETED' && (
                   <button

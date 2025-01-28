@@ -27,7 +27,12 @@ const BookExperimentModal = ({
       setLoading(true);
       setError('');
 
-      if (!newExperiment.title || !newExperiment.description || !newExperiment.startDate || !newExperiment.endDate) {
+      if (
+        !newExperiment.title ||
+        !newExperiment.description ||
+        !newExperiment.startDate ||
+        !newExperiment.endDate
+      ) {
         throw new Error('Please fill in all required fields');
       }
 
@@ -36,10 +41,10 @@ const BookExperimentModal = ({
         description: newExperiment.description,
         startDate: newExperiment.startDate.toISOString(),
         endDate: newExperiment.endDate.toISOString(),
-        items: stockNeeded.map((item: { name: any; quantity: any; }) => ({
+        items: stockNeeded.map((item: { name: any; quantity: any }) => ({
           name: item.name,
-          quantity: item.quantity
-        }))
+          quantity: item.quantity,
+        })),
       };
 
       const response = await fetch('/api/experiments', {
@@ -47,18 +52,24 @@ const BookExperimentModal = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(experimentData)
+        body: JSON.stringify(experimentData),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         if (response.status === 409 && data.alternativeSlots) {
-          throw new Error(`Time slot conflict. Alternative slots available: ${
-            data.alternativeSlots.map((slot: { startDate: string | number | Date; endDate: string | number | Date; }) => 
-              `${new Date(slot.startDate).toLocaleString()} - ${new Date(slot.endDate).toLocaleString()}`
-            ).join(', ')
-          }`);
+          throw new Error(
+            `Time slot conflict. Alternative slots available: ${data.alternativeSlots
+              .map(
+                (slot: {
+                  startDate: string | number | Date;
+                  endDate: string | number | Date;
+                }) =>
+                  `${new Date(slot.startDate).toLocaleString()} - ${new Date(slot.endDate).toLocaleString()}`
+              )
+              .join(', ')}`
+          );
         }
         throw new Error(data.error || 'Failed to create experiment');
       }
@@ -69,11 +80,10 @@ const BookExperimentModal = ({
         description: '',
         room: 'Lab1',
         startDate: new Date(),
-        endDate: new Date()
+        endDate: new Date(),
       });
       setStockNeeded([]);
       setSearchQuery('');
-
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -123,7 +133,8 @@ const BookExperimentModal = ({
               <DatePicker
                 selected={newExperiment.startDate}
                 onChange={(date: Date | null) =>
-                  date && setNewExperiment({ ...newExperiment, startDate: date })
+                  date &&
+                  setNewExperiment({ ...newExperiment, startDate: date })
                 }
                 showTimeSelect
                 dateFormat='Pp'
@@ -185,23 +196,25 @@ const BookExperimentModal = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {stockNeeded.map((item: any, index: Key | null | undefined) => (
-                    <tr key={index}>
-                      <td className='border-b border-gray-700 py-2'>
-                        {item.name}
-                      </td>
-                      <td className='border-b border-gray-700 py-2'>
-                        <input
-                          type='number'
-                          value={item.quantity}
-                          onChange={(e) =>
-                            handleStockChange(index, Number(e.target.value))
-                          }
-                          className='w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                  {stockNeeded.map(
+                    (item: any, index: Key | null | undefined) => (
+                      <tr key={index}>
+                        <td className='border-b border-gray-700 py-2'>
+                          {item.name}
+                        </td>
+                        <td className='border-b border-gray-700 py-2'>
+                          <input
+                            type='number'
+                            value={item.quantity}
+                            onChange={(e) =>
+                              handleStockChange(index, Number(e.target.value))
+                            }
+                            className='w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
+                          />
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>

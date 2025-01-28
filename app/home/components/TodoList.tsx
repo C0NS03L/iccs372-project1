@@ -22,12 +22,12 @@ export default function TodoList() {
       setLoading(true);
       const today = new Date();
       const todayUtc = today.toISOString().split('T')[0];
-      
+
       const response = await fetch(`/api/task?query_date=${todayUtc}`);
       if (!response.ok) {
         throw new Error('Failed to fetch tasks');
       }
-      
+
       const tasksData = await response.json();
       setTasks(tasksData);
     } catch (err) {
@@ -81,13 +81,13 @@ export default function TodoList() {
       )}
       <div className='mt-2'>
         {tasks.length === 0 ? (
-          <p className='text-center text-gray-400 mt-4'>No tasks for today</p>
+          <p className='mt-4 text-center text-gray-400'>No tasks for today</p>
         ) : (
           <ul className='mt-4'>
             {tasks.map((task) => (
               <li
                 key={task.id}
-                className={`border-b border-gray-700 py-2 flex items-center justify-between ${
+                className={`flex items-center justify-between border-b border-gray-700 py-2 ${
                   task.completed ? 'opacity-50' : ''
                 }`}
               >
@@ -95,7 +95,9 @@ export default function TodoList() {
                   <input
                     type='checkbox'
                     checked={task.completed}
-                    onChange={(e) => handleTaskCompletion(task.id, e.target.checked)}
+                    onChange={(e) =>
+                      handleTaskCompletion(task.id, e.target.checked)
+                    }
                     className='rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500'
                   />
                   <span className={task.completed ? 'line-through' : ''}>
