@@ -5,6 +5,7 @@
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { availableStock } from './Schedule';
+import { Key, useState } from 'react'; // Add this import
 
 const BookExperimentModal = ({
   isModalOpen,
@@ -13,12 +14,73 @@ const BookExperimentModal = ({
   setNewExperiment,
   stockNeeded,
   setStockNeeded,
-  createExperiment,
   searchQuery,
   setSearchQuery,
   handleStockChange,
   addStockItem,
 }: any) => {
+  const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+
+  const createExperiment = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      if (!newExperiment.title || !newExperiment.description || !newExperiment.startDate || !newExperiment.endDate) {
+        throw new Error('Please fill in all required fields');
+      }
+
+      const experimentData = {
+        title: newExperiment.title,
+        description: newExperiment.description,
+        startDate: newExperiment.startDate.toISOString(),
+        endDate: newExperiment.endDate.toISOString(),
+        items: stockNeeded.map((item: { name: any; quantity: any; }) => ({
+          name: item.name,
+          quantity: item.quantity
+        }))
+      };
+
+      const response = await fetch('/api/experiments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(experimentData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 409 && data.alternativeSlots) {
+          throw new Error(`Time slot conflict. Alternative slots available: ${
+            data.alternativeSlots.map((slot: { startDate: string | number | Date; endDate: string | number | Date; }) => 
+              `${new Date(slot.startDate).toLocaleString()} - ${new Date(slot.endDate).toLocaleString()}`
+            ).join(', ')
+          }`);
+        }
+        throw new Error(data.error || 'Failed to create experiment');
+      }
+
+      setIsModalOpen(false);
+      setNewExperiment({
+        title: '',
+        description: '',
+        room: 'Lab1',
+        startDate: new Date(),
+        endDate: new Date()
+      });
+      setStockNeeded([]);
+      setSearchQuery('');
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     isModalOpen && (
       <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50'>
@@ -60,8 +122,8 @@ const BookExperimentModal = ({
               <label className='text-gray-400'>Start Date:</label>
               <DatePicker
                 selected={newExperiment.startDate}
-                onChange={(date: Date) =>
-                  setNewExperiment({ ...newExperiment, startDate: date })
+                onChange={(date: Date | null) =>
+                  date && setNewExperiment({ ...newExperiment, startDate: date })
                 }
                 showTimeSelect
                 dateFormat='Pp'
@@ -72,8 +134,8 @@ const BookExperimentModal = ({
               <label className='text-gray-400'>End Date:</label>
               <DatePicker
                 selected={newExperiment.endDate}
-                onChange={(date: Date) =>
-                  setNewExperiment({ ...newExperiment, endDate: date })
+                onChange={(date: Date | null) =>
+                  date && setNewExperiment({ ...newExperiment, endDate: date })
                 }
                 showTimeSelect
                 dateFormat='Pp'
@@ -123,7 +185,7 @@ const BookExperimentModal = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {stockNeeded.map((item, index) => (
+                  {stockNeeded.map((item: any, index: Key | null | undefined) => (
                     <tr key={index}>
                       <td className='border-b border-gray-700 py-2'>
                         {item.name}

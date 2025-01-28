@@ -12,9 +12,14 @@ export default function StockTracking() {
 
   useEffect(() => {
     const fetchStocks = async () => {
-      const response = await fetch('/api/inventory');
-      const inventory = await response.json();
-      setStocks(inventory);
+      try {
+        const response = await fetch('/api/inventory');
+        const inventory = await response.json();
+        setStocks(inventory);
+      } catch (error) {
+        console.error('Error fetching inventory:', error);
+        setStocks([]);
+      }
     };
     fetchStocks();
   }, []);
