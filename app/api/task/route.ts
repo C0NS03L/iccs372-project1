@@ -7,6 +7,7 @@ export type TaskAddRequest = {
   title: string;
   description: string;
   completed: boolean;
+  dueDate?: string;
 };
 
 export async function GET() {
@@ -29,7 +30,22 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const data = await streamToString(request.body);
-    const { title, description, completed }: TaskAddRequest = JSON.parse(data);
+    const { title, description, completed, dueDate }: TaskAddRequest =
+      JSON.parse(data);
+
+    // If dueDate is not provided, set it to end of current day (2025-01-28 23:59:59)
+    const taskDueDate = dueDate
+      ? new Date(dueDate)
+      : new Date(
+          Date.UTC(
+            2025, // year
+            0, // month (0-based, so 0 is January)
+            28, // day
+            23, // hours
+            59, // minutes
+            59 // seconds
+          )
+        );
 
     const newTask = await prisma.task.create({
       data: {
@@ -37,6 +53,7 @@ export async function POST(request: NextRequest) {
         description,
         completed,
         category: 'GENERAL',
+        dueDate: taskDueDate,
       },
     });
 
