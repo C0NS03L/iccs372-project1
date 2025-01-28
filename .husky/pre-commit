@@ -1,3 +1,1 @@
-echo "Running pre-commit hook"
-bun format:fix
-bun lint
+bun lint-staged
