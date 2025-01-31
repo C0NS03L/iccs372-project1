@@ -108,7 +108,7 @@ async function processInventory(
             inventoryName: name,
             quantity:
               updatedInventory.lowStockThreshold - updatedInventory.stockLevel,
-            arrivalDate,
+            arrivalDate: arrivalDate,
           },
         });
         console.log(`Reordered ${name} for ${updatedInventory.name}`);
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       validateExperimentData(data);
 
     await checkTimeslotConflicts(start, end);
-    await processInventory(items);
+    await processInventory(items, start);
 
     const newExperiment = await prisma.experiments.create({
       data: {
@@ -183,6 +183,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         description,
         startDate: start.toISOString(),
         endDate: end.toISOString(),
+        status: 'PENDING',
       },
     });
 
@@ -219,6 +220,7 @@ export async function GET() {
     const experiments = await prisma.experiments.findMany({
       select: {
         startDate: true,
+        endDate: true,
         title: true,
         description: true,
         status: true,
@@ -257,7 +259,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     }
 
     if (items && items.length > 0) {
-      await processInventory(items);
+      await processInventory(items, start);
     }
 
     const updatedExperiment = await prisma.experiments.update({

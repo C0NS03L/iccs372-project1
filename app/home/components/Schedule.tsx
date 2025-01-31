@@ -5,6 +5,7 @@ import { useState } from 'react';
 import BookExperimentModal from './BookExperimentModal'; // Import modal
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import ExperimentList from './ExperimentList'; // Import ExperimentList component
 
 const MySwal = withReactContent(Swal);
 
@@ -151,33 +152,44 @@ const Schedule = () => {
   };
 
   return (
-    <div className='col-span-1 row-span-1 rounded bg-gray-800 p-4 shadow'>
-      <h2 className='text-xl font-bold'>Currently Booked Experiments</h2>
-      <ul className='mt-4'>
-        {experiments.map((experiment, index) => (
-          <li key={index} className='border-b border-gray-700 py-2'>
-            <div>
-              {experiment.title} - {experiment.room}
-            </div>
-            <div className='text-sm text-gray-400'>
-              {experiment.startDate.toLocaleString()} -{' '}
-              {experiment.endDate.toLocaleString()}
-            </div>
-            <button
-              onClick={() => editExperiment(index)}
-              className='mt-2 rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600'
-            >
-              Edit
-            </button>
-          </li>
-        ))}
-      </ul>
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className='mt-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600'
-      >
-        Book Experiment
-      </button>
+    <div className='col-span-1 row-span-1 flex h-full flex-col rounded bg-gray-800 p-4 shadow'>
+      {/* Header Section */}
+      <div className='mb-4 flex items-center justify-between'>
+        <h2 className='text-xl font-bold'>Currently Booked Experiments</h2>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className='rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600'
+        >
+          Book Experiment
+        </button>
+      </div>
+
+      {/* Main Content Area - will scroll */}
+      <div className='flex-1 overflow-y-auto'>
+        <ul className='space-y-2'>
+          {experiments?.map((experiment, index) => (
+            <li key={index} className='border-b border-gray-700 py-2'>
+              <div>
+                {experiment.title} - {experiment.room}
+              </div>
+              <div className='text-sm text-gray-400'>
+                {experiment.startDate.toLocaleString()} -{' '}
+                {experiment.endDate.toLocaleString()}
+              </div>
+              <button
+                onClick={() => editExperiment(index)}
+                className='mt-2 rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600'
+              >
+                Edit
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        <div className='mt-4'>
+          <ExperimentList />
+        </div>
+      </div>
 
       <BookExperimentModal
         isModalOpen={isModalOpen}

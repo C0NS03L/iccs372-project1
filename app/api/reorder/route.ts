@@ -3,17 +3,32 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const bigIntSerializer = (key: string, value: any) => {
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  return value;
+};
+
 export async function GET() {
   try {
     const reorders = await prisma.reorder.findMany({
       select: {
+        id: true,
+        inventoryId: true,
         inventoryName: true,
         quantity: true,
         status: true,
-        createdAt: true,
+        arrivalDate: true,
       },
     });
-    return NextResponse.json(reorders, { status: 200 });
+
+    const serializedReorders = JSON.parse(
+      JSON.stringify(reorders, bigIntSerializer)
+    );
+
+    return NextResponse.json(serializedReorders, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -22,6 +37,7 @@ export async function GET() {
     );
   }
 }
+
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
@@ -34,19 +50,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const arrivalDate = new Date();
+    const arrivalDate = new Date('2025-01-28 15:52:20');
     arrivalDate.setDate(arrivalDate.getDate() + 3);
 
     const newReorder = await prisma.reorder.create({
       data: {
-        inventoryId,
+        inventoryId: BigInt(inventoryId),
         inventoryName,
         quantity,
         arrivalDate,
+        status: 'PENDING',
       },
     });
 
-    return NextResponse.json(newReorder, { status: 201 });
+    const serializedNewReorder = JSON.parse(
+      JSON.stringify(newReorder, bigIntSerializer)
+    );
+
+    return NextResponse.json(serializedNewReorder, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -58,9 +79,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
     const data = await request.json();
+    const { id, quantity, status } = data;
 
     if (!id) {
       return NextResponse.json(
@@ -73,12 +93,23 @@ export async function PUT(request: NextRequest) {
 
     const updatedReorder = await prisma.reorder.update({
       where: { id: reorderId },
-      data,
+      data: {
+        status,
+        quantity,
+        updatedAt: new Date(),
+      },
     });
 
-    return NextResponse.json(updatedReorder, { status: 200 });
+    const serializedUpdatedReorder = JSON.parse(
+      JSON.stringify(updatedReorder, bigIntSerializer)
+    );
+
+    return NextResponse.json(serializedUpdatedReorder, { status: 200 });
   } catch (error) {
-    console.error(error);
+    if (error instanceof Error) {
+      console.error('Error updating reorder:', error.message);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json(
       { error: 'Failed to update reorder' },
       { status: 500 }

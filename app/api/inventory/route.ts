@@ -7,12 +7,17 @@ const prisma = new PrismaClient();
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    const { name, description, stockLevel, lowStockThreshold } = data;
+    const { name, description, stockLevel, lowStockThreshold, unit } = data;
 
-    if (!name || !description || stockLevel === undefined || lowStockThreshold === undefined) {
+    if (
+      !name ||
+      !description ||
+      stockLevel === undefined ||
+      lowStockThreshold === undefined
+    ) {
       return NextResponse.json(
         { error: 'Missing required fields' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -22,21 +27,20 @@ export async function POST(request: NextRequest) {
         description,
         stockLevel,
         lowStockThreshold,
+        unit: unit || 'units',
       },
     });
 
-    // use bigIntReplacer to convert BigInt fields to strings
     const newInventoryStringId = JSON.parse(
-      JSON.stringify(newInventory, bigIntReplacer),
+      JSON.stringify(newInventory, bigIntReplacer)
     );
-
 
     return NextResponse.json(newInventoryStringId, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
       { error: 'Failed to create inventory' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -45,7 +49,7 @@ export async function GET() {
   try {
     const inventoryItems = await prisma.inventory.findMany();
     const newInventoryItems = JSON.parse(
-      JSON.stringify(inventoryItems, bigIntReplacer),
+      JSON.stringify(inventoryItems, bigIntReplacer)
     );
 
     return NextResponse.json(newInventoryItems, { status: 200 });
@@ -54,21 +58,20 @@ export async function GET() {
 
     return NextResponse.json(
       { error: 'Failed to fetch inventory items' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
     const data = await request.json();
+    const { id, ...updateData } = data;
 
     if (!id) {
       return NextResponse.json(
         { error: 'Inventory ID is required' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -76,20 +79,47 @@ export async function PUT(request: NextRequest) {
 
     const updatedInventory = await prisma.inventory.update({
       where: { id: inventoryId },
-      data,
+      data: updateData,
     });
 
     const updatedInventoryStringId = JSON.parse(
-      JSON.stringify(updatedInventory, bigIntReplacer),
+      JSON.stringify(updatedInventory, bigIntReplacer)
     );
-
 
     return NextResponse.json(updatedInventoryStringId, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
       { error: 'Failed to update inventory' },
-      { status: 500 },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const data = await request.json();
+    const { id } = data;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Inventory ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const inventoryId = BigInt(id);
+
+    await prisma.inventory.delete({
+      where: { id: inventoryId },
+    });
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: 'Failed to delete inventory item' },
+      { status: 500 }
     );
   }
 }

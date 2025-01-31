@@ -58,8 +58,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(tasksWithIdAsString, { status: 200 });
   } catch (error) {
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: 'Failed to fetch tasks: ' + error.message },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
-      { error: 'Failed to fetch tasks: ' + error.message },
+      { error: 'Failed to fetch tasks' },
       { status: 500 }
     );
   }

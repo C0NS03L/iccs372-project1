@@ -1,11 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
-
+import { useEffect, Key, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { availableStock } from './Schedule';
-import { Key, useState } from 'react'; // Add this import
+
+interface InventoryItem {
+  id: string;
+  name: string;
+  description: string;
+  stockLevel: number;
+  unit: string;
+  lowStockThreshold: number;
+}
 
 const BookExperimentModal = ({
   isModalOpen,
@@ -17,10 +23,51 @@ const BookExperimentModal = ({
   searchQuery,
   setSearchQuery,
   handleStockChange,
-  addStockItem,
 }: any) => {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      fetchInventory();
+    }
+  }, [isModalOpen]);
+
+  const fetchInventory = async () => {
+    try {
+      setInventoryLoading(true);
+      const response = await fetch('/api/inventory');
+      if (!response.ok) {
+        throw new Error('Failed to fetch inventory');
+      }
+      const data = await response.json();
+      setInventory(data);
+    } catch (error) {
+      setInventoryError(
+        error instanceof Error ? error.message : 'Failed to load inventory'
+      );
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
+  const addStockItem = (item: InventoryItem) => {
+    if (!stockNeeded.some((stock: { id: string }) => stock.id === item.id)) {
+      setStockNeeded([
+        ...stockNeeded,
+        {
+          id: item.id,
+          name: item.name,
+          quantity: 1,
+          unit: item.unit,
+          available: item.stockLevel,
+        },
+      ]);
+    }
+  };
 
   const createExperiment = async () => {
     try {
@@ -36,18 +83,40 @@ const BookExperimentModal = ({
         throw new Error('Please fill in all required fields');
       }
 
+      // Validate stock quantities
+      for (const stock of stockNeeded) {
+        const inventoryItem = inventory.find((item) => item.id === stock.id);
+        if (!inventoryItem) continue;
+
+        // if (stock.quantity > inventoryItem.stockLevel) {
+        //   throw new Error(
+        //     `Insufficient stock for ${stock.name}. Available: ${inventoryItem.stockLevel} ${inventoryItem.unit}`
+        //   );
+        // }
+      }
+
       const experimentData = {
         title: newExperiment.title,
         description: newExperiment.description,
         startDate: newExperiment.startDate.toISOString(),
         endDate: newExperiment.endDate.toISOString(),
-        items: stockNeeded.map((item: { name: any; quantity: any }) => ({
-          name: item.name,
-          quantity: item.quantity,
-        })),
+        room: newExperiment.room,
+        items: stockNeeded.map(
+          (item: {
+            id: string;
+            name: string;
+            quantity: number;
+            unit: string;
+          }) => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+          })
+        ),
       };
 
-      const response = await fetch('/api/experiments', {
+      const response = await fetch('/api/experiment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,8 +148,8 @@ const BookExperimentModal = ({
         title: '',
         description: '',
         room: 'Lab1',
-        startDate: new Date(),
-        endDate: new Date(),
+        startDate: new Date('2025-01-28T15:21:47Z'),
+        endDate: new Date('2025-01-28T15:21:47Z'),
       });
       setStockNeeded([]);
       setSearchQuery('');
@@ -93,7 +162,7 @@ const BookExperimentModal = ({
 
   return (
     isModalOpen && (
-      <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-50'>
+      <div className='fixed inset-0 z-10 flex items-center justify-center bg-black bg-opacity-50'>
         <div className='w-128 rounded bg-gray-800 p-6 shadow-lg'>
           <h3 className='mb-4 text-xl font-bold'>Book a New Experiment</h3>
           <div>
@@ -129,7 +198,9 @@ const BookExperimentModal = ({
               <option value='Lab3'>Lab3</option>
             </select>
             <div className='mb-2'>
-              <label className='text-gray-400'>Start Date:</label>
+              <label className='block text-sm font-medium text-gray-400'>
+                Start Date:
+              </label>
               <DatePicker
                 selected={newExperiment.startDate}
                 onChange={(date: Date | null) =>
@@ -139,10 +210,13 @@ const BookExperimentModal = ({
                 showTimeSelect
                 dateFormat='Pp'
                 className='w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
+                minDate={new Date('2025-01-28T15:21:47Z')}
               />
             </div>
             <div className='mb-4'>
-              <label className='text-gray-400'>End Date:</label>
+              <label className='block text-sm font-medium text-gray-400'>
+                End Date:
+              </label>
               <DatePicker
                 selected={newExperiment.endDate}
                 onChange={(date: Date | null) =>
@@ -151,10 +225,12 @@ const BookExperimentModal = ({
                 showTimeSelect
                 dateFormat='Pp'
                 className='w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
+                minDate={newExperiment.startDate}
               />
             </div>
+
             <div className='mb-4'>
-              <h3 className='text-gray-200'>Stock Needed</h3>
+              <h3 className='mb-2 text-gray-200'>Stock Needed</h3>
               <input
                 type='text'
                 placeholder='Search for stock items...'
@@ -163,26 +239,53 @@ const BookExperimentModal = ({
                 className='mb-2 w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
               />
               <div className='max-h-32 overflow-y-auto rounded border border-gray-700'>
-                {availableStock
-                  .filter((item) =>
-                    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map((item, index) => (
-                    <div
-                      key={index}
-                      className='flex justify-between border-b border-gray-700 p-2'
-                    >
-                      <span>
-                        {item.name} (In Stock: {item.currentStock})
-                      </span>
-                      <button
-                        onClick={() => addStockItem(item)}
-                        className='rounded bg-blue-500 px-2 py-1 text-white hover:bg-blue-600'
+                {inventoryLoading ? (
+                  <div className='p-2 text-gray-400'>Loading inventory...</div>
+                ) : inventoryError ? (
+                  <div className='p-2 text-red-500'>{inventoryError}</div>
+                ) : (
+                  inventory
+                    .filter((item) =>
+                      item.name
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase())
+                    )
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        className='flex justify-between border-b border-gray-700 p-2'
                       >
-                        Add
-                      </button>
-                    </div>
-                  ))}
+                        <div>
+                          <span className='font-medium'>{item.name}</span>
+                          <span className='ml-2 text-sm text-gray-400'>
+                            (In Stock: {item.stockLevel} {item.unit})
+                          </span>
+                          <div className='text-sm text-gray-500'>
+                            {item.description}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => addStockItem(item)}
+                          disabled={stockNeeded.some(
+                            (stock: { id: string }) => stock.id === item.id
+                          )}
+                          className={`rounded px-2 py-1 text-white ${
+                            stockNeeded.some(
+                              (stock: { id: string }) => stock.id === item.id
+                            )
+                              ? 'cursor-not-allowed bg-gray-600'
+                              : 'bg-blue-500 hover:bg-blue-600'
+                          }`}
+                        >
+                          {stockNeeded.some(
+                            (stock: { id: string }) => stock.id === item.id
+                          )
+                            ? 'Added'
+                            : 'Add'}
+                        </button>
+                      </div>
+                    ))
+                )}
               </div>
               <table className='mt-4 w-full table-auto border-collapse'>
                 <thead>
@@ -192,6 +295,15 @@ const BookExperimentModal = ({
                     </th>
                     <th className='border-b border-gray-700 py-2 text-left'>
                       Quantity
+                    </th>
+                    <th className='border-b border-gray-700 py-2 text-left'>
+                      Unit
+                    </th>
+                    <th className='border-b border-gray-700 py-2 text-left'>
+                      Available
+                    </th>
+                    <th className='border-b border-gray-700 py-2 text-left'>
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -209,8 +321,30 @@ const BookExperimentModal = ({
                             onChange={(e) =>
                               handleStockChange(index, Number(e.target.value))
                             }
+                            min={1}
+                            max={item.available}
                             className='w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
                           />
+                        </td>
+                        <td className='border-b border-gray-700 py-2'>
+                          {item.unit}
+                        </td>
+                        <td className='border-b border-gray-700 py-2'>
+                          {item.available}
+                        </td>
+                        <td className='border-b border-gray-700 py-2'>
+                          <button
+                            onClick={() => {
+                              const newStockNeeded = [...stockNeeded];
+                              if (typeof index === 'number') {
+                                newStockNeeded.splice(index, 1);
+                                setStockNeeded(newStockNeeded);
+                              }
+                            }}
+                            className='rounded bg-red-500 px-2 py-1 text-white hover:bg-red-600'
+                          >
+                            Remove
+                          </button>
                         </td>
                       </tr>
                     )
@@ -218,14 +352,23 @@ const BookExperimentModal = ({
                 </tbody>
               </table>
             </div>
+
+            {error && (
+              <div className='mb-4 rounded bg-red-500 p-2 text-white'>
+                {error}
+              </div>
+            )}
+
             <button
               onClick={createExperiment}
-              className='mt-4 w-full rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600'
+              disabled={loading}
+              className='mt-4 w-full rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600 disabled:bg-green-800'
             >
-              Create Experiment
+              {loading ? 'Creating...' : 'Create Experiment'}
             </button>
             <button
               onClick={() => setIsModalOpen(false)}
+              disabled={loading}
               className='mt-2 w-full rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600'
             >
               Close

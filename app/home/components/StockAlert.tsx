@@ -3,12 +3,12 @@ import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 
 interface StockAlert {
-  id: string | number;
+  id: string;
+  inventoryId: string;
   inventoryName: string;
   quantity: number;
-  arrivalDate: string;
   status: string;
-  createdAt: string;
+  arrivalDate: string;
 }
 
 export default function StockAlert() {
@@ -23,12 +23,19 @@ export default function StockAlert() {
   const fetchStockAlerts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/reorders');
+      const response = await fetch('/api/reorder');
       if (!response.ok) {
         throw new Error('Failed to fetch stock alerts');
       }
       const data = await response.json();
-      setStockAlerts(data);
+
+      // Sort by creation date
+      const sortedData = [...data].sort(
+        (a: StockAlert, b: StockAlert) =>
+          new Date(b.arrivalDate).getTime() - new Date(a.arrivalDate).getTime()
+      );
+
+      setStockAlerts(sortedData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       Swal.fire({
@@ -60,8 +67,8 @@ export default function StockAlert() {
         showCancelButton: true,
         confirmButtonText: 'Yes, Add',
         preConfirm: (value) => {
-          if (!value || isNaN(Number(value))) {
-            Swal.showValidationMessage('Please enter a valid number');
+          if (!value || isNaN(Number(value)) || Number(value) <= 0) {
+            Swal.showValidationMessage('Please enter a valid positive number');
           } else {
             return Number(value);
           }
@@ -69,22 +76,40 @@ export default function StockAlert() {
       });
 
       if (result.isConfirmed) {
-        const response = await fetch(`/api/reorders?id=${alert.id}`, {
+        const response = await fetch('/api/reorder', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            id: alert.id,
             quantity: result.value,
             status: 'COMPLETED',
           }),
         });
 
         if (!response.ok) {
-          throw new Error('Failed to update reorder status');
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update reorder status');
         }
 
-        // Refresh the stock alerts
+        // After successful update, update the inventory
+        const inventoryResponse = await fetch('/api/inventory', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: alert.inventoryName,
+            id: alert.inventoryId,
+            stockLevel: { increment: result.value },
+          }),
+        });
+
+        if (!inventoryResponse.ok) {
+          throw new Error('Failed to update inventory stock level');
+        }
+
         await fetchStockAlerts();
 
         await Swal.fire({
@@ -98,6 +123,7 @@ export default function StockAlert() {
         });
       }
     } catch (err) {
+      console.error('Error in handleComplete:', err);
       Swal.fire({
         title: 'Error!',
         text:
@@ -110,51 +136,63 @@ export default function StockAlert() {
       });
     }
   };
-
-  if (loading) {
-    return (
-      <div className='col-span-1 row-span-1 rounded bg-gray-800 p-4 shadow'>
-        <h2 className='text-xl font-bold'>Stock Alert</h2>
-        <div className='mt-4 text-center'>Loading...</div>
-      </div>
-    );
-  }
-
   return (
     <div className='col-span-1 row-span-1 rounded bg-gray-800 p-4 shadow'>
       <h2 className='text-xl font-bold'>Stock Alert</h2>
       {error && (
         <div className='mt-2 rounded bg-red-500 p-2 text-white'>{error}</div>
       )}
-      <ul className='mt-4'>
-        {stockAlerts.length === 0 ? (
-          <li className='text-center text-gray-400'>No stock alerts</li>
-        ) : (
-          stockAlerts.map((alert) => (
-            <li
-              key={alert.id}
-              className={`border-b border-gray-700 py-2 ${
-                alert.status === 'COMPLETED' ? 'line-through opacity-50' : ''
-              }`}
-            >
-              <div className='flex items-center justify-between'>
-                <span>
-                  <strong>{alert.inventoryName}</strong>: Buy {alert.quantity}{' '}
-                  by {new Date(alert.arrivalDate).toLocaleDateString()}
-                </span>
-                {alert.status !== 'COMPLETED' && (
-                  <button
-                    onClick={() => handleComplete(alert)}
-                    className='rounded bg-blue-500 px-2 py-1 text-white hover:bg-blue-600'
-                  >
-                    Complete
-                  </button>
-                )}
-              </div>
-            </li>
-          ))
-        )}
-      </ul>
+      {loading ? (
+        <div className='mt-4 text-center'>Loading...</div>
+      ) : (
+        <ul className='mt-4 space-y-2'>
+          {stockAlerts.length === 0 ? (
+            <li className='text-center text-gray-400'>No stock alerts</li>
+          ) : (
+            stockAlerts.map((alert, index) => (
+              <li
+                key={`${alert.inventoryName}-${alert.arrivalDate}-${index}`}
+                className={`relative rounded border border-gray-700 p-3 ${
+                  alert.status === 'COMPLETED'
+                    ? 'bg-gray-700/30'
+                    : 'hover:bg-gray-700/30'
+                }`}
+                style={{ zIndex: alert.status === 'COMPLETED' ? 1 : 2 }}
+              >
+                <div className='flex items-center justify-between'>
+                  <div className='space-y-1'>
+                    <div
+                      className={
+                        alert.status === 'COMPLETED'
+                          ? 'text-gray-500 line-through'
+                          : ''
+                      }
+                    >
+                      <strong>{alert.inventoryName}</strong>
+                      <span className='ml-2 text-sm text-gray-400'>
+                        (Need {alert.quantity})
+                      </span>
+                    </div>
+                    <div className='text-sm text-gray-400'>
+                      Arrive by:{' '}
+                      {new Date(alert.arrivalDate).toLocaleDateString()}
+                    </div>
+                  </div>
+                  {alert.status !== 'COMPLETED' && (
+                    <button
+                      onClick={() => handleComplete(alert)}
+                      className='rounded bg-blue-500 px-3 py-1 text-white transition-colors hover:bg-blue-600'
+                      style={{ zIndex: 3 }}
+                    >
+                      Complete
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
     </div>
   );
 }
