@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { processInventory } from '../route';
+import { processInventory } from '../helper';
 
 const prisma = new PrismaClient();
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   try {
@@ -47,7 +47,7 @@ export async function GET(
 }
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   try {
@@ -116,7 +116,7 @@ export async function PUT(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   try {
