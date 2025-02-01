@@ -7,27 +7,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model LabRoom {
+  id          BigInt        @id @default(autoincrement())
+  name        String
+  description String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  Experiments Experiments[]
+}
+
 model Experiments {
   id          BigInt   @id @default(autoincrement())
   title       String
   description String
   startDate   DateTime
   endDate     DateTime
-  status      String   @default("PENDING") // New field for status
+  status      String   @default("PENDING")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  Tasks       Task[] // Associated experiment-related tasks
+  Tasks       Task[]
+  labRoomId   BigInt
+  LabRoom     LabRoom  @relation(fields: [labRoomId], references: [id])
 }
 
 model Inventory {
   id                BigInt    @id @default(autoincrement())
   name              String
   description       String
-  stockLevel        Int       @default(0) // Current stock level
-  lowStockThreshold Int       @default(5) // Threshold for triggering reorder
+  stockLevel        Int       @default(0)
+  lowStockThreshold Int       @default(5)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  Reorders          Reorder[] // Reorder history
+  Reorders          Reorder[]
 }
 
 model Reorder {
