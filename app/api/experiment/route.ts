@@ -19,6 +19,22 @@ interface ExperimentData {
   labRoomId: string;
 }
 
+class TimeSlotError extends Error {
+  status: number;
+  alternativeSlots: { startDate: Date; endDate: Date }[];
+
+  constructor(
+    message: string,
+    status: number,
+    alternativeSlots: { startDate: Date; endDate: Date }[]
+  ) {
+    super(message);
+    this.name = 'TimeSlotError';
+    this.status = status;
+    this.alternativeSlots = alternativeSlots;
+  }
+}
+
 function validateExperimentData(data: ExperimentData) {
   const { title, description, startDate, endDate, items, labRoomId } = data;
 
@@ -67,11 +83,14 @@ async function checkTimeslotConflicts(
       take: 3,
     });
 
-    throw {
+    const error = {
+      name: 'TimeSlotError',
+      message: 'Timeslot conflicts with another experiment',
       status: 409,
-      message: 'Timeslot conflicts with an existing experiment',
-      alternativeSlots,
-    };
+      alternativeSlots: alternativeSlots,
+    } as TimeSlotError;
+
+    throw error;
   }
 }
 
@@ -190,14 +209,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       JSON.parse(JSON.stringify(newExperiment, bigIntReplacer)),
       { status: 201 }
     );
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error: error.message || 'Failed to process request',
-        alternativeSlots: error.alternativeSlots,
-      },
-      { status: error.status || 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof TimeSlotError) {
+      return NextResponse.json(
+        {
+          error: error.message || 'Failed to process request',
+          alternativeSlots: error.alternativeSlots,
+        },
+        { status: error.status || 500 }
+      );
+    } else {
+      console.error(error);
+      return NextResponse.json(
+        { error: 'Failed to create experiment' },
+        { status: 500 }
+      );
+    }
   }
 }
 
@@ -262,7 +289,12 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: error.message || 'Failed to update experiment' },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to update experiment',
+      },
       { status: 500 }
     );
   }
