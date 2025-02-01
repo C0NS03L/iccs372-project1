@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    const { name, description, stockLevel, lowStockThreshold } = data;
+    const { name, description, stockLevel, lowStockThreshold, unit } = data;
 
     if (
       !name ||
@@ -27,10 +27,10 @@ export async function POST(request: NextRequest) {
         description,
         stockLevel,
         lowStockThreshold,
+        unit: unit || 'units',
       },
     });
 
-    // use bigIntReplacer to convert BigInt fields to strings
     const newInventoryStringId = JSON.parse(
       JSON.stringify(newInventory, bigIntReplacer)
     );
@@ -65,22 +65,35 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
     const data = await request.json();
+    let { id } = data;
+    const { name, ...updateData } = data;
 
-    if (!id) {
+    if (!id && !name) {
       return NextResponse.json(
-        { error: 'Inventory ID is required' },
+        { error: 'Inventory ID or Name is required' },
         { status: 400 }
       );
+    }
+
+    if (!id) {
+      const inventory = await prisma.inventory.findFirst({
+        where: { name },
+      });
+      if (!inventory) {
+        return NextResponse.json(
+          { error: 'Inventory not found' },
+          { status: 404 }
+        );
+      }
+      id = inventory.id;
     }
 
     const inventoryId = BigInt(id);
 
     const updatedInventory = await prisma.inventory.update({
       where: { id: inventoryId },
-      data,
+      data: updateData,
     });
 
     const updatedInventoryStringId = JSON.parse(
@@ -92,6 +105,34 @@ export async function PUT(request: NextRequest) {
     console.error(error);
     return NextResponse.json(
       { error: 'Failed to update inventory' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const data = await request.json();
+    const { id } = data;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Inventory ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const inventoryId = BigInt(id);
+
+    await prisma.inventory.delete({
+      where: { id: inventoryId },
+    });
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: 'Failed to delete inventory item' },
       { status: 500 }
     );
   }

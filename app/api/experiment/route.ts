@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { bigIntReplacer } from '@/app/lib/common';
 import { toZonedTime } from 'date-fns-tz';
+import { processInventory } from './helper';
 
 const prisma = new PrismaClient();
 
@@ -22,15 +23,16 @@ interface ExperimentData {
 function validateExperimentData(data: ExperimentData) {
   const { title, description, startDate, endDate, items, labRoomId } = data;
 
-  if (
-    !title ||
-    !description ||
-    !startDate ||
-    !endDate ||
-    !items ||
-    !labRoomId
-  ) {
-    throw new Error('Missing required fields or invalid format');
+  const missingFields = [];
+  if (!title) missingFields.push('title');
+  if (!description) missingFields.push('description');
+  if (!startDate) missingFields.push('startDate');
+  if (!endDate) missingFields.push('endDate');
+  if (!items) missingFields.push('items');
+  if (!labRoomId) missingFields.push('labRoomId');
+
+  if (missingFields.length > 0) {
+    throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
   }
 
   const start = new Date(startDate);
@@ -61,80 +63,7 @@ async function checkTimeslotConflicts(
   });
 
   if (conflict) {
-    const alternativeSlots = await prisma.experiments.findMany({
-      select: { startDate: true, endDate: true },
-      orderBy: { startDate: 'asc' },
-      take: 3,
-    });
-
-    throw {
-      status: 409,
-      message: 'Timeslot conflicts with an existing experiment',
-      alternativeSlots,
-    };
-  }
-}
-
-async function processInventory(
-  items: InventoryItem[],
-  experimentStartDate: Date
-) {
-  const arrivalDate = new Date(experimentStartDate);
-  arrivalDate.setDate(arrivalDate.getDate() - 3);
-
-  for (const { name, quantity } of items) {
-    const inventoryItems = await prisma.inventory.findMany({
-      where: { name },
-      orderBy: { stockLevel: 'desc' },
-    });
-
-    let remainingQuantity = quantity;
-
-    for (const inventory of inventoryItems) {
-      const allocated = Math.min(remainingQuantity, inventory.stockLevel);
-      remainingQuantity -= allocated;
-
-      await prisma.inventory.update({
-        where: { id: inventory.id },
-        data: { stockLevel: { decrement: allocated } },
-      });
-
-      const updatedInventory = await prisma.inventory.findUnique({
-        where: { id: inventory.id },
-      });
-
-      if (
-        updatedInventory &&
-        updatedInventory.stockLevel < updatedInventory.lowStockThreshold
-      ) {
-        await prisma.reorder.create({
-          data: {
-            inventoryId: updatedInventory.id,
-            inventoryName: name,
-            quantity:
-              updatedInventory.lowStockThreshold - updatedInventory.stockLevel,
-            arrivalDate,
-          },
-        });
-      }
-    }
-
-    if (remainingQuantity > 0) {
-      const inventory = await prisma.inventory.findFirst({ where: { name } });
-
-      if (!inventory) {
-        throw new Error(`Inventory item "${name}" not found.`);
-      }
-
-      await prisma.reorder.create({
-        data: {
-          inventoryId: inventory.id,
-          inventoryName: name,
-          quantity: remainingQuantity,
-          arrivalDate,
-        },
-      });
-    }
+    throw new Error('Timeslot conflict detected');
   }
 }
 
@@ -179,7 +108,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         description,
         startDate: start.toISOString(),
         endDate: end.toISOString(),
+        status: 'PENDING',
         labRoomId,
+        items: items as unknown as Prisma.JsonArray,
       },
     });
 
@@ -189,24 +120,42 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       JSON.parse(JSON.stringify(newExperiment, bigIntReplacer)),
       { status: 201 }
     );
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error: error.message || 'Failed to process request',
-        alternativeSlots: error.alternativeSlots,
-      },
-      { status: error.status || 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(error);
+      return NextResponse.json(
+        { error: error.message || 'Failed to create experiment' },
+        { status: 500 }
+      );
+    } else {
+      console.error(error);
+      return NextResponse.json(
+        { error: 'Failed to create experiment' },
+        { status: 500 }
+      );
+    }
   }
 }
 
 export async function GET() {
   try {
     const experiments = await prisma.experiments.findMany({
-      select: { startDate: true, title: true, description: true, status: true },
+      select: {
+        id: true,
+        startDate: true,
+        endDate: true,
+        title: true,
+        description: true,
+        status: true,
+        LabRoom: { select: { name: true } },
+        items: true,
+      },
     });
 
-    return NextResponse.json(experiments, { status: 200 });
+    return NextResponse.json(
+      JSON.parse(JSON.stringify(experiments, bigIntReplacer)),
+      { status: 200 }
+    );
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -243,6 +192,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
         ...(description && { description }),
         ...(start && { startDate: start.toISOString() }),
         ...(end && { endDate: end.toISOString() }),
+        ...(items && { items: items as unknown as Prisma.JsonArray }),
       },
     });
 
@@ -255,7 +205,12 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: error.message || 'Failed to update experiment' },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to update experiment',
+      },
       { status: 500 }
     );
   }
