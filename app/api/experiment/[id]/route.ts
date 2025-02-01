@@ -66,24 +66,28 @@ export async function PUT(
       },
     });
 
-    const processInventoryData = data.items.map((newItem) => {
-      // Find matching item in old experiment
-      const oldItem = oldExperiment?.items?.find(
-        (item) => item.id === newItem.id
-      );
+    const processInventoryData = data.items.map(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newItem: { id: any; quantity: number }) => {
+        //@ts-expect-error stupid type error >:C
+        const oldItem = oldExperiment?.items?.find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (item: any) => item.id === newItem.id
+        );
 
-      // Calculate the difference in quantity
-      // If oldItem exists, subtract its quantity from new quantity
-      // If oldItem doesn't exist, use the full new quantity
-      const quantityDifference = newItem.quantity - (oldItem?.quantity || 0);
+        // Calculate the difference in quantity
+        // If oldItem exists, subtract its quantity from new quantity
+        // If oldItem doesn't exist, use the full new quantity
+        const quantityDifference = newItem.quantity - (oldItem?.quantity || 0);
 
-      console.log('quantityDifference', quantityDifference);
+        console.log('quantityDifference', quantityDifference);
 
-      return {
-        ...newItem,
-        quantity: quantityDifference,
-      };
-    });
+        return {
+          ...newItem,
+          quantity: quantityDifference,
+        };
+      }
+    );
 
     processInventory(processInventoryData, new Date(data.startDate));
 
