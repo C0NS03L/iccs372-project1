@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
-import { useEffect, Key, useState } from 'react';
+import { useEffect, Key, useState, useCallback } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -13,6 +13,11 @@ interface InventoryItem {
   lowStockThreshold: number;
 }
 
+interface LabRoom {
+  id: string;
+  name: string;
+}
+
 const BookExperimentModal = ({
   isModalOpen,
   setIsModalOpen,
@@ -23,18 +28,98 @@ const BookExperimentModal = ({
   searchQuery,
   setSearchQuery,
   handleStockChange,
+  experimentId,
 }: any) => {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [editMode, setEditMode] = useState(false); // Add state for edit mode
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
+  const [labList, setLabList] = useState<LabRoom[]>([]);
+
+  console.log(experimentId);
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      setEditMode(false);
+      setError('');
+      setStockNeeded([]);
+      setSearchQuery('');
+      setNewExperiment({
+        title: '',
+        description: '',
+        room: '',
+        startDate: new Date(),
+        endDate: new Date(),
+      });
+    }
+  }, [isModalOpen, setNewExperiment, setStockNeeded, setSearchQuery]);
+
+  const getLabList = async () => {
+    try {
+      const response = await fetch('/api/lab');
+      if (!response.ok) {
+        throw new Error('Failed to fetch labs');
+      }
+      const data = await response.json();
+      setLabList(data);
+      console.log(data);
+    } catch (error) {
+      setInventoryError(
+        error instanceof Error ? error.message : 'Failed to load labs'
+      );
+    }
+  };
+
+  const fetchExperimentData = useCallback(
+    async (id: string) => {
+      try {
+        const response = await fetch(`/api/experiment/${id}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch experiment data');
+        }
+        const data = await response.json();
+        setNewExperiment({
+          title: data.title,
+          description: data.description,
+          room: data.labRoomId,
+          startDate: new Date(data.startDate),
+          endDate: new Date(data.endDate),
+        });
+        setStockNeeded(
+          data.items.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            available: inventory.find((invItem) => invItem.id === item.id)
+              ?.stockLevel,
+          }))
+        );
+      } catch (error) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : 'Failed to load experiment data'
+        );
+      }
+    },
+    [inventory, setNewExperiment, setStockNeeded]
+  );
 
   useEffect(() => {
     if (isModalOpen) {
       fetchInventory();
+      getLabList();
+      if (experimentId) {
+        fetchExperimentData(experimentId);
+        setEditMode(true);
+      } else {
+        setEditMode(false);
+      }
     }
-  }, [isModalOpen]);
+  }, [isModalOpen, experimentId, fetchExperimentData]);
 
   const fetchInventory = async () => {
     try {
@@ -78,7 +163,8 @@ const BookExperimentModal = ({
         !newExperiment.title ||
         !newExperiment.description ||
         !newExperiment.startDate ||
-        !newExperiment.endDate
+        !newExperiment.endDate ||
+        !newExperiment.room
       ) {
         throw new Error('Please fill in all required fields');
       }
@@ -94,7 +180,7 @@ const BookExperimentModal = ({
         description: newExperiment.description,
         startDate: newExperiment.startDate.toISOString(),
         endDate: newExperiment.endDate.toISOString(),
-        room: newExperiment.room,
+        labRoomId: newExperiment.room,
         items: stockNeeded.map(
           (item: {
             id: string;
@@ -110,6 +196,7 @@ const BookExperimentModal = ({
         ),
       };
 
+      console.log(experimentData);
       const response = await fetch('/api/experiment', {
         method: 'POST',
         headers: {
@@ -141,12 +228,133 @@ const BookExperimentModal = ({
       setNewExperiment({
         title: '',
         description: '',
-        room: 'Lab1',
+        room: '',
         startDate: new Date('2025-01-28T15:21:47Z'),
         endDate: new Date('2025-01-28T15:21:47Z'),
       });
       setStockNeeded([]);
       setSearchQuery('');
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const editExperiment = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      if (
+        !newExperiment.title ||
+        !newExperiment.description ||
+        !newExperiment.startDate ||
+        !newExperiment.endDate ||
+        !newExperiment.room
+      ) {
+        throw new Error('Please fill in all required fields');
+      }
+
+      // Validate stock quantities
+      for (const stock of stockNeeded) {
+        const inventoryItem = inventory.find((item) => item.id === stock.id);
+        if (!inventoryItem) continue;
+      }
+
+      const experimentData = {
+        title: newExperiment.title,
+        description: newExperiment.description,
+        startDate: newExperiment.startDate.toISOString(),
+        endDate: newExperiment.endDate.toISOString(),
+        labRoomId: newExperiment.room,
+        items: stockNeeded.map(
+          (item: {
+            id: string;
+            name: string;
+            quantity: number;
+            unit: string;
+          }) => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+          })
+        ),
+      };
+
+      console.log(experimentData);
+      const response = await fetch(`/api/experiment/${experimentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(experimentData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 409 && data.alternativeSlots) {
+          throw new Error(
+            `Time slot conflict. Alternative slots available: ${data.alternativeSlots
+              .map(
+                (slot: {
+                  startDate: string | number | Date;
+                  endDate: string | number | Date;
+                }) =>
+                  `${new Date(slot.startDate).toLocaleString()} - ${new Date(slot.endDate).toLocaleString()}`
+              )
+              .join(', ')}`
+          );
+        }
+        throw new Error(data.error || 'Failed to edit experiment');
+      }
+
+      setIsModalOpen(false);
+      setNewExperiment({
+        title: '',
+        description: '',
+        room: '',
+        startDate: new Date('2025-01-28T15:21:47Z'),
+        endDate: new Date('2025-01-28T15:21:47Z'),
+      });
+      setStockNeeded([]);
+      setSearchQuery('');
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteExperiment = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const response = await fetch(`/api/experiment/${experimentId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete experiment');
+      }
+
+      setIsModalOpen(false);
+      setNewExperiment({
+        title: '',
+        description: '',
+        room: '',
+        startDate: new Date('2025-01-28T15:21:47Z'),
+        endDate: new Date('2025-01-28T15:21:47Z'),
+      });
+      setStockNeeded([]);
+      setSearchQuery('');
+      window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -158,7 +366,9 @@ const BookExperimentModal = ({
     isModalOpen && (
       <div className='fixed inset-0 z-10 flex items-center justify-center bg-black bg-opacity-50'>
         <div className='w-128 rounded bg-gray-800 p-6 shadow-lg'>
-          <h3 className='mb-4 text-xl font-bold'>Book a New Experiment</h3>
+          <h3 className='mb-4 text-xl font-bold'>
+            {editMode ? 'Edit Experiment' : 'Book a New Experiment'}
+          </h3>
           <div>
             <input
               type='text'
@@ -187,9 +397,12 @@ const BookExperimentModal = ({
               }
               className='mb-2 w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
             >
-              <option value='Lab1'>Lab1</option>
-              <option value='Lab2'>Lab2</option>
-              <option value='Lab3'>Lab3</option>
+              <option value=''>Select a Lab Room</option>
+              {labList.map((lab) => (
+                <option key={lab.id} value={lab.id}>
+                  {lab.name}
+                </option>
+              ))}
             </select>
             <div className='mb-2'>
               <label
@@ -240,7 +453,6 @@ const BookExperimentModal = ({
               className='mb-2 w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
             />
             <div className='max-h-32 overflow-y-auto rounded border border-gray-700'>
-              .
               {inventoryLoading && (
                 <div className='p-2 text-gray-400'>Loading inventory...</div>
               )}
@@ -357,17 +569,37 @@ const BookExperimentModal = ({
             </div>
           )}
 
-          <button
-            onClick={createExperiment}
-            disabled={loading}
-            className='mt-4 w-full rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600 disabled:bg-green-800'
-          >
-            {loading ? 'Creating...' : 'Create Experiment'}
-          </button>
+          {editMode ? (
+            <>
+              <button
+                onClick={editExperiment}
+                disabled={loading}
+                className='mt-4 w-full rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:bg-blue-800'
+              >
+                {loading ? 'Editing...' : 'Edit Experiment'}
+              </button>
+              <button
+                onClick={deleteExperiment}
+                disabled={loading}
+                className='mt-2 w-full rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600'
+              >
+                Delete Experiment
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={createExperiment}
+              disabled={loading}
+              className='mt-4 w-full rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600 disabled:bg-green-800'
+            >
+              {loading ? 'Creating...' : 'Create Experiment'}
+            </button>
+          )}
+
           <button
             onClick={() => setIsModalOpen(false)}
             disabled={loading}
-            className='mt-2 w-full rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600'
+            className='mt-2 w-full rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600'
           >
             Close
           </button>

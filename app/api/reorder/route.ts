@@ -36,19 +36,22 @@ async function getReordersByArrivalDate(arrivalDate: string | number | Date) {
     orderBy: { createdAt: 'desc' },
   });
 
-  return reorders.map(({ inventoryName, quantity, status, createdAt }) => ({
-    inventoryName,
-    quantity,
-    status,
-    createdAt,
-  }));
+  return reorders.map(
+    ({ inventoryName, quantity, status, createdAt, arrivalDate }) => ({
+      inventoryName,
+      quantity,
+      status,
+      createdAt,
+      arrivalDate,
+    })
+  );
 }
 
 async function getGroupedReorders() {
   const reorders = await prisma.reorder.groupBy({
     by: ['inventoryName'],
     _sum: { quantity: true },
-    _max: { status: true, createdAt: true },
+    _max: { status: true, createdAt: true, arrivalDate: true },
   });
 
   return reorders.map(({ inventoryName, _sum, _max }) => ({
@@ -56,6 +59,7 @@ async function getGroupedReorders() {
     quantity: _sum.quantity,
     status: _max.status,
     createdAt: _max.createdAt,
+    arrivalDate: _max.arrivalDate,
   }));
 }
 
@@ -92,7 +96,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const arrivalDate = new Date('2025-01-28 15:52:20');
+    const arrivalDate = new Date();
     arrivalDate.setDate(arrivalDate.getDate() + 3);
 
     const newReorder = await prisma.reorder.create({
@@ -115,7 +119,74 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const data = await request.json();
-    const { id, quantity, status } = data;
+    const { id } = data;
+    const { name, quantity, status } = data;
+
+    console.log('data:', data);
+
+    if (!id && !name) {
+      return NextResponse.json(
+        { error: 'Reorder ID or Name is required' },
+        { status: 400 }
+      );
+    }
+
+    let updatedReorders;
+
+    if (!id) {
+      // Update all reorders with the given name
+      updatedReorders = await prisma.reorder.updateMany({
+        where: { inventoryName: name },
+        data: { status },
+      });
+
+      if (updatedReorders.count === 0) {
+        return NextResponse.json(
+          { error: 'No reorders found' },
+          { status: 404 }
+        );
+      }
+
+      // Fetch the updated reorders to return
+      const reorders = await prisma.reorder.findMany({
+        where: { inventoryName: name },
+      });
+
+      return NextResponse.json(
+        {
+          message: `Updated ${updatedReorders.count} reorders`,
+          reorders: JSON.parse(JSON.stringify(reorders, bigIntReplacer)),
+        },
+        { status: 200 }
+      );
+    } else {
+      // Update single reorder by ID
+      const updatedReorder = await prisma.reorder.update({
+        where: { id: BigInt(id) },
+        data: { quantity, status },
+      });
+
+      return NextResponse.json(
+        JSON.parse(JSON.stringify(updatedReorder, bigIntReplacer)),
+        { status: 200 }
+      );
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('Error updating reorder:', error.message);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json(
+      { error: 'Failed to update reorder' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const data = await request.json();
+    const { id } = data;
 
     if (!id) {
       return NextResponse.json(
@@ -124,23 +195,21 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const updatedReorder = await prisma.reorder.update({
+    const deletedReorder = await prisma.reorder.delete({
       where: { id: BigInt(id) },
-      data: { quantity, status },
     });
 
-    const serializedUpdatedReorder = JSON.parse(
-      JSON.stringify(updatedReorder, bigIntReplacer)
+    return NextResponse.json(
+      JSON.parse(JSON.stringify(deletedReorder, bigIntReplacer)),
+      { status: 200 }
     );
-
-    return NextResponse.json(serializedUpdatedReorder, { status: 200 });
   } catch (error) {
     if (error instanceof Error) {
-      console.error('Error updating reorder:', error.message);
+      console.error('Error deleting reorder:', error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json(
-      { error: 'Failed to update reorder' },
+      { error: 'Failed to delete reorder' },
       { status: 500 }
     );
   }

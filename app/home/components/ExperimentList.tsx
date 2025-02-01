@@ -1,11 +1,14 @@
 'use client';
 import { useState, useEffect } from 'react';
+import BookExperimentModal from './BookExperimentModal'; // Add this import
 
 interface ExperimentItem {
   id: string;
   title: string;
   description: string;
-  room: string;
+  LabRoom: {
+    name: string;
+  };
   startDate: string;
   endDate: string;
   createdBy: string;
@@ -24,9 +27,55 @@ export default function ExperimentList() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedExperimentId, setSelectedExperimentId] = useState<
+    string | null
+  >(null);
+  const [newExperiment, setNewExperiment] = useState({
+    title: '',
+    description: '',
+    room: '',
+    startDate: new Date(),
+    endDate: new Date(),
+  });
+  const [stockNeeded, setStockNeeded] = useState<
+    { id: string; name: string; quantity: number; unit: string }[]
+  >([]);
+  const [searchQuery, setSearchQuery] = useState('');
+
   useEffect(() => {
     fetchExperiments();
   }, []);
+
+  const refreshExperiments = () => {
+    fetchExperiments();
+  };
+
+  const handleStockChange = (index: number, value: number) => {
+    const newStockNeeded = [...stockNeeded];
+    newStockNeeded[index] = {
+      ...newStockNeeded[index],
+      quantity: value,
+    };
+    setStockNeeded(newStockNeeded);
+  };
+
+  const handleEdit = (id: string) => {
+    console.log('Editing experiment', id);
+    // Reset the form state
+    setNewExperiment({
+      title: '',
+      description: '',
+      room: '',
+      startDate: new Date(),
+      endDate: new Date(),
+    });
+    setStockNeeded([]);
+    setSearchQuery('');
+
+    setSelectedExperimentId(id);
+    setIsModalOpen(true);
+  };
 
   const fetchExperiments = async () => {
     try {
@@ -37,6 +86,7 @@ export default function ExperimentList() {
       }
       const data = await response.json();
       setExperiments(data);
+      console.log(data);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load experiments'
@@ -49,8 +99,8 @@ export default function ExperimentList() {
   const filteredExperiments = experiments.filter(
     (exp) =>
       exp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exp.description.toLowerCase().includes(searchTerm.toLowerCase())
-    //   exp.room.toLowerCase().includes(searchTerm.toLowerCase())
+      exp.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      exp.LabRoom.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -93,61 +143,79 @@ export default function ExperimentList() {
           </div>
         ) : (
           <div className='space-y-4'>
-            {filteredExperiments.map((experiment) => (
-              <div
-                key={experiment.id}
-                className='rounded-lg border border-gray-700 p-4'
-              >
-                <div className='mb-2 flex items-center justify-between'>
-                  <h3 className='text-lg font-semibold'>{experiment.title}</h3>
-                  <span
-                    className={`rounded-full px-2 py-1 text-xs ${
-                      new Date(experiment.endDate) <
-                      new Date('2025-01-28T16:26:35Z')
-                        ? 'bg-gray-600 text-gray-300'
-                        : new Date(experiment.startDate) <=
-                            new Date('2025-01-28T16:26:35Z')
-                          ? 'bg-green-500/20 text-green-400'
-                          : 'bg-blue-500/20 text-blue-400'
-                    }`}
+            {filteredExperiments.length > 0 &&
+              filteredExperiments.map((experiment) => (
+                <div
+                  key={experiment.id}
+                  className='rounded-lg border border-gray-700 p-4'
+                >
+                  <div className='mb-2 flex items-center justify-between'>
+                    <h3 className='text-lg font-semibold'>
+                      {experiment.title}
+                    </h3>
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs ${
+                        new Date(experiment.endDate) < new Date()
+                          ? 'bg-gray-600 text-gray-300'
+                          : new Date(experiment.startDate) <= new Date()
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-blue-500/20 text-blue-400'
+                      }`}
+                    >
+                      {new Date(experiment.endDate) < new Date()
+                        ? 'Completed'
+                        : new Date(experiment.startDate) <= new Date()
+                          ? 'In Progress'
+                          : 'Scheduled'}
+                    </span>
+                  </div>
+                  <p className='text-gray-400'>{experiment.description}</p>
+                  <div className='mt-2 space-y-1 text-sm text-gray-400'>
+                    <div>Room: {experiment.LabRoom.name}</div>
+                    <div>
+                      Time: {new Date(experiment.startDate).toLocaleString()} -{' '}
+                      {new Date(experiment.endDate).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className='mt-3'>
+                    <h4 className='mb-2 text-sm font-semibold text-gray-300'>
+                      Required Items:
+                    </h4>
+                    <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
+                      {experiment.items.map((item) => (
+                        <div
+                          key={`${experiment.id}-${item.id}`}
+                          className='rounded bg-gray-700/50 px-2 py-1 text-sm'
+                        >
+                          {item.name}: {item.quantity} {item.unit}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleEdit(experiment.id)}
+                    className='mt-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600'
                   >
-                    {new Date(experiment.endDate) <
-                    new Date('2025-01-28T16:26:35Z')
-                      ? 'Completed'
-                      : new Date(experiment.startDate) <=
-                          new Date('2025-01-28T16:26:35Z')
-                        ? 'In Progress'
-                        : 'Scheduled'}
-                  </span>
+                    Edit
+                  </button>
                 </div>
-                <p className='text-gray-400'>{experiment.description}</p>
-                <div className='mt-2 space-y-1 text-sm text-gray-400'>
-                  <div>Room: {experiment.room}</div>
-                  <div>
-                    Time: {new Date(experiment.startDate).toLocaleString()} -{' '}
-                    {new Date(experiment.endDate).toLocaleString()}
-                  </div>
-                </div>
-                <div className='mt-3'>
-                  <h4 className='mb-2 text-sm font-semibold text-gray-300'>
-                    Required Items:
-                  </h4>
-                  <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
-                    {experiment?.items?.map((item, index) => (
-                      <div
-                        key={`${experiment.id}-${item.id}-${index}`}
-                        className='rounded bg-gray-700/50 px-2 py-1 text-sm'
-                      >
-                        {item.name}: {item.quantity} {item.unit}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         )}
       </div>
+      <BookExperimentModal
+        isModalOpen={isModalOpen}
+        setIsModalOpen={setIsModalOpen}
+        newExperiment={newExperiment}
+        setNewExperiment={setNewExperiment}
+        stockNeeded={stockNeeded}
+        setStockNeeded={setStockNeeded}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        handleStockChange={handleStockChange}
+        experimentId={selectedExperimentId}
+        onSuccess={refreshExperiments} // Add this line
+      />
     </div>
   );
 }

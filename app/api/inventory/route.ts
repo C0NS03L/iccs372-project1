@@ -66,13 +66,29 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const data = await request.json();
-    const { id, ...updateData } = data;
+    let { id } = data;
+    const { name, ...updateData } = data;
 
-    if (!id) {
+    console.log('data:', data);
+
+    if (!id && !name) {
       return NextResponse.json(
-        { error: 'Inventory ID is required' },
+        { error: 'Inventory ID or Name is required' },
         { status: 400 }
       );
+    }
+
+    if (!id) {
+      const inventory = await prisma.inventory.findFirst({
+        where: { name },
+      });
+      if (!inventory) {
+        return NextResponse.json(
+          { error: 'Inventory not found' },
+          { status: 404 }
+        );
+      }
+      id = inventory.id;
     }
 
     const inventoryId = BigInt(id);

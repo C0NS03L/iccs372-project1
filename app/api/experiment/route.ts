@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { bigIntReplacer } from '@/app/lib/common';
 import { toZonedTime } from 'date-fns-tz';
 
@@ -19,34 +19,19 @@ interface ExperimentData {
   labRoomId: string;
 }
 
-class TimeSlotError extends Error {
-  status: number;
-  alternativeSlots: { startDate: Date; endDate: Date }[];
-
-  constructor(
-    message: string,
-    status: number,
-    alternativeSlots: { startDate: Date; endDate: Date }[]
-  ) {
-    super(message);
-    this.name = 'TimeSlotError';
-    this.status = status;
-    this.alternativeSlots = alternativeSlots;
-  }
-}
-
 function validateExperimentData(data: ExperimentData) {
   const { title, description, startDate, endDate, items, labRoomId } = data;
 
-  if (
-    !title ||
-    !description ||
-    !startDate ||
-    !endDate ||
-    !items ||
-    !labRoomId
-  ) {
-    throw new Error('Missing required fields or invalid format');
+  const missingFields = [];
+  if (!title) missingFields.push('title');
+  if (!description) missingFields.push('description');
+  if (!startDate) missingFields.push('startDate');
+  if (!endDate) missingFields.push('endDate');
+  if (!items) missingFields.push('items');
+  if (!labRoomId) missingFields.push('labRoomId');
+
+  if (missingFields.length > 0) {
+    throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
   }
 
   const start = new Date(startDate);
@@ -77,82 +62,138 @@ async function checkTimeslotConflicts(
   });
 
   if (conflict) {
-    const alternativeSlots = await prisma.experiments.findMany({
-      select: { startDate: true, endDate: true },
-      orderBy: { startDate: 'asc' },
-      take: 3,
-    });
-
-    const error = {
-      name: 'TimeSlotError',
-      message: 'Timeslot conflicts with another experiment',
-      status: 409,
-      alternativeSlots: alternativeSlots,
-    } as TimeSlotError;
-
-    throw error;
+    throw new Error('Timeslot conflict detected');
   }
 }
 
-async function processInventory(
+export async function processInventory(
   items: InventoryItem[],
   experimentStartDate: Date
 ) {
+  console.log('Processing inventory for experiment:', items);
   const arrivalDate = new Date(experimentStartDate);
   arrivalDate.setDate(arrivalDate.getDate() - 3);
 
-  for (const { name, quantity } of items) {
-    const inventoryItems = await prisma.inventory.findMany({
-      where: { name },
-      orderBy: { stockLevel: 'desc' },
-    });
-
-    let remainingQuantity = quantity;
-
-    for (const inventory of inventoryItems) {
-      const allocated = Math.min(remainingQuantity, inventory.stockLevel);
-      remainingQuantity -= allocated;
-
-      await prisma.inventory.update({
-        where: { id: inventory.id },
-        data: { stockLevel: { decrement: allocated } },
+  try {
+    for (const { name, quantity } of items) {
+      const inventoryItems = await prisma.inventory.findMany({
+        where: { name },
+        orderBy: { stockLevel: 'desc' },
       });
 
-      const updatedInventory = await prisma.inventory.findUnique({
-        where: { id: inventory.id },
-      });
+      let remainingQuantity = quantity;
 
-      if (
-        updatedInventory &&
-        updatedInventory.stockLevel < updatedInventory.lowStockThreshold
-      ) {
+      for (const inventory of inventoryItems) {
+        if (remainingQuantity <= 0) {
+          // Find existing reorder entry for this inventory item
+          const existingReorder = await prisma.reorder.findFirst({
+            where: {
+              inventoryId: inventory.id,
+              inventoryName: name,
+            },
+            orderBy: {
+              arrivalDate: 'asc',
+            },
+          });
+
+          // If there's an existing reorder, update its quantity
+          if (existingReorder) {
+            console.log(existingReorder);
+            const newQuantity = Math.max(existingReorder.quantity + quantity);
+            await prisma.reorder.update({
+              where: {
+                id: existingReorder.id,
+              },
+              data: {
+                quantity: newQuantity,
+              },
+            });
+
+            console.log('Updating reorder', name, 'NEWquantity', newQuantity);
+
+            // If the new quantity is 0, we can delete the reorder entry
+            if (newQuantity <= 0) {
+              await prisma.reorder.delete({
+                where: {
+                  id: existingReorder.id,
+                },
+              });
+
+              if (newQuantity < 0) {
+                console.log('Returning', -newQuantity, 'of', name);
+                await prisma.inventory.update({
+                  where: { id: inventory.id },
+                  data: { stockLevel: { increment: -newQuantity } },
+                });
+              }
+            }
+          }
+
+          // Skip to next inventory item since we don't need any more quantity
+          continue;
+        }
+
+        const allocated = Math.min(remainingQuantity, inventory.stockLevel);
+        remainingQuantity -= allocated;
+
+        console.log(
+          'Allocating',
+          allocated,
+          'of',
+          name,
+          'from',
+          inventory.name
+        );
+
+        await prisma.inventory.update({
+          where: { id: inventory.id },
+          data: { stockLevel: { decrement: allocated } },
+        });
+
+        const updatedInventory = await prisma.inventory.findUnique({
+          where: { id: inventory.id },
+        });
+
+        if (
+          updatedInventory &&
+          updatedInventory.stockLevel < updatedInventory.lowStockThreshold
+        ) {
+          console.log('Reordering', name, 'from', inventory.name);
+          await prisma.reorder.create({
+            data: {
+              inventoryId: updatedInventory.id,
+              inventoryName: name,
+              quantity:
+                updatedInventory.lowStockThreshold -
+                updatedInventory.stockLevel,
+              arrivalDate: arrivalDate,
+            },
+          });
+        }
+      }
+
+      if (remainingQuantity > 0) {
+        console.log('Reordering', remainingQuantity, 'of', name);
+        const inventory = await prisma.inventory.findFirst({ where: { name } });
+
+        if (!inventory) {
+          throw new Error(`Inventory item "${name}" not found.`);
+        }
+
+        console.log('Reordering', name, 'amount', remainingQuantity);
         await prisma.reorder.create({
           data: {
-            inventoryId: updatedInventory.id,
+            inventoryId: inventory.id,
             inventoryName: name,
-            quantity:
-              updatedInventory.lowStockThreshold - updatedInventory.stockLevel,
-            arrivalDate: arrivalDate,
+            quantity: remainingQuantity,
+            arrivalDate,
           },
         });
       }
     }
-
-    if (remainingQuantity > 0) {
-      const inventory = await prisma.inventory.findFirst({ where: { name } });
-
-      if (!inventory) {
-        throw new Error(`Inventory item "${name}" not found.`);
-      }
-
-      await prisma.reorder.create({
-        data: {
-          inventoryId: inventory.id,
-          inventoryName: name,
-          quantity: remainingQuantity,
-          arrivalDate,
-        },
-      });
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(error);
     }
   }
 }
@@ -200,6 +241,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         endDate: end.toISOString(),
         status: 'PENDING',
         labRoomId,
+        items: items as unknown as Prisma.JsonArray,
       },
     });
 
@@ -210,13 +252,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 201 }
     );
   } catch (error: unknown) {
-    if (error instanceof TimeSlotError) {
+    if (error instanceof Error) {
+      console.error(error);
       return NextResponse.json(
-        {
-          error: error.message || 'Failed to process request',
-          alternativeSlots: error.alternativeSlots,
-        },
-        { status: error.status || 500 }
+        { error: error.message || 'Failed to create experiment' },
+        { status: 500 }
       );
     } else {
       console.error(error);
@@ -232,15 +272,21 @@ export async function GET() {
   try {
     const experiments = await prisma.experiments.findMany({
       select: {
+        id: true,
         startDate: true,
         endDate: true,
         title: true,
         description: true,
         status: true,
+        LabRoom: { select: { name: true } },
+        items: true,
       },
     });
 
-    return NextResponse.json(experiments, { status: 200 });
+    return NextResponse.json(
+      JSON.parse(JSON.stringify(experiments, bigIntReplacer)),
+      { status: 200 }
+    );
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -277,6 +323,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
         ...(description && { description }),
         ...(start && { startDate: start.toISOString() }),
         ...(end && { endDate: end.toISOString() }),
+        ...(items && { items: items as unknown as Prisma.JsonArray }),
       },
     });
 

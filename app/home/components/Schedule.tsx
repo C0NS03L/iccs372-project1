@@ -9,12 +9,6 @@ import ExperimentList from './ExperimentList'; // Import ExperimentList componen
 
 const MySwal = withReactContent(Swal);
 
-export const availableStock = [
-  { name: 'Item A', currentStock: 10 },
-  { name: 'Item B', currentStock: 5 },
-  { name: 'Item C', currentStock: 15 },
-];
-
 const Schedule = () => {
   const [experiments, setExperiments] = useState<any[]>([]);
   const [stockNeeded, setStockNeeded] = useState<any[]>([]);
@@ -85,29 +79,6 @@ const Schedule = () => {
         },
       });
       return;
-    }
-
-    const missingStock = stockNeeded.filter(
-      (item) =>
-        item.quantity >
-        (availableStock.find((stock) => stock.name === item.name)
-          ?.currentStock ?? 0)
-    );
-
-    if (missingStock.length > 0) {
-      const stockAlertItems = missingStock
-        .map((item) => `- ${item.name}: Need ${item.quantity}`)
-        .join('<br>');
-
-      MySwal.fire({
-        title: 'Buy Stock Alert!',
-        html: `The following items are missing stock and need to be purchased:<br>${stockAlertItems}`,
-        icon: 'warning',
-        confirmButtonText: 'Add to Stock Alert',
-        customClass: {
-          popup: 'bg-gray-800 text-gray-200',
-        },
-      });
     }
 
     if (isEditing && editingExperimentIndex !== null) {

@@ -35,6 +35,8 @@ export default function StockAlert() {
           new Date(b.arrivalDate).getTime() - new Date(a.arrivalDate).getTime()
       );
 
+      console.log(sortedData);
+
       setStockAlerts(sortedData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -82,7 +84,7 @@ export default function StockAlert() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            id: alert.id,
+            name: alert.inventoryName,
             quantity: result.value,
             status: 'COMPLETED',
           }),
@@ -121,6 +123,7 @@ export default function StockAlert() {
             confirmButton: 'bg-blue-500 hover:bg-blue-600 text-white',
           },
         });
+        window.location.reload();
       }
     } catch (err) {
       console.error('Error in handleComplete:', err);
