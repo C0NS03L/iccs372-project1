@@ -1,31 +1,76 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { bigIntReplacer } from '@/app/lib/common';
 
 const prisma = new PrismaClient();
 
-export async function GET() {
+async function getReordersByArrivalDate(arrivalDate) {
+  const date = new Date(arrivalDate);
+  if (isNaN(date.getTime())) {
+    return { error: 'Invalid date format', status: 400 };
+  }
+
+  const startOfDayUtc = new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      0,
+      0,
+      0
+    )
+  );
+  const endOfDayUtc = new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      23,
+      59,
+      59
+    )
+  );
+
+  const reorders = await prisma.reorder.findMany({
+    where: { arrivalDate: { gte: startOfDayUtc, lte: endOfDayUtc } },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return reorders.map(({ inventoryName, quantity, status, createdAt }) => ({
+    inventoryName,
+    quantity,
+    status,
+    createdAt,
+  }));
+}
+
+async function getGroupedReorders() {
+  const reorders = await prisma.reorder.groupBy({
+    by: ['inventoryName'],
+    _sum: { quantity: true },
+    _max: { status: true, createdAt: true },
+  });
+
+  return reorders.map(({ inventoryName, _sum, _max }) => ({
+    inventoryName,
+    quantity: _sum.quantity,
+    status: _max.status,
+    createdAt: _max.createdAt,
+  }));
+}
+
+export async function GET(request) {
   try {
-    const reorders = await prisma.reorder.groupBy({
-      by: ['inventoryName'],
-      _sum: {
-        quantity: true,
-      },
-      _max: {
-        status: true,
-        createdAt: true,
-      },
+    const searchParams = request.nextUrl.searchParams;
+    const arrivalDate = searchParams.get('arrival_date');
+    const data = arrivalDate
+      ? await getReordersByArrivalDate(arrivalDate)
+      : await getGroupedReorders();
+
+    if (data.error) return NextResponse.json(data, { status: data.status });
+    return NextResponse.json(JSON.parse(JSON.stringify(data, bigIntReplacer)), {
+      status: 200,
     });
-
-    const formattedReorders = reorders.map((reorder) => ({
-      inventoryName: reorder.inventoryName,
-      quantity: reorder._sum.quantity,
-      status: reorder._max.status,
-      createdAt: reorder._max.createdAt,
-    }));
-
-    // use bigInt replacer
-    return NextResponse.json(formattedReorders, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -35,10 +80,9 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request) {
   try {
-    const data = await request.json();
-    const { inventoryId, inventoryName, quantity } = data;
+    const { inventoryId, inventoryName, quantity } = await request.json();
 
     if (!inventoryId || !inventoryName || !quantity) {
       return NextResponse.json(
@@ -51,19 +95,13 @@ export async function POST(request: NextRequest) {
     arrivalDate.setDate(arrivalDate.getDate() + 3);
 
     const newReorder = await prisma.reorder.create({
-      data: {
-        inventoryId,
-        inventoryName,
-        quantity,
-        arrivalDate,
-      },
+      data: { inventoryId, inventoryName, quantity, arrivalDate },
     });
 
-    const newReorderWithStringId = JSON.parse(
-      JSON.stringify(newReorder, bigIntReplacer)
+    return NextResponse.json(
+      JSON.parse(JSON.stringify(newReorder, bigIntReplacer)),
+      { status: 201 }
     );
-
-    return NextResponse.json(newReorderWithStringId, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -73,7 +111,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function PUT(request: NextRequest) {
+export async function PUT(request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -86,10 +124,8 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const reorderId = BigInt(id);
-
     const updatedReorder = await prisma.reorder.update({
-      where: { id: reorderId },
+      where: { id: BigInt(id) },
       data,
     });
 
