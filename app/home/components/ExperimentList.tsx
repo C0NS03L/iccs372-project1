@@ -61,7 +61,6 @@ export default function ExperimentList() {
   };
 
   const handleEdit = (id: string) => {
-    console.log('Editing experiment', id);
     // Reset the form state
     setNewExperiment({
       title: '',
@@ -86,7 +85,6 @@ export default function ExperimentList() {
       }
       const data = await response.json();
       setExperiments(data);
-      console.log(data);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load experiments'

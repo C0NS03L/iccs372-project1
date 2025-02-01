@@ -80,8 +80,6 @@ export async function PUT(
         // If oldItem doesn't exist, use the full new quantity
         const quantityDifference = newItem.quantity - (oldItem?.quantity || 0);
 
-        console.log('quantityDifference', quantityDifference);
-
         return {
           ...newItem,
           quantity: quantityDifference,

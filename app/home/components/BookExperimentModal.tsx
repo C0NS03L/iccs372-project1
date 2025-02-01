@@ -38,8 +38,6 @@ const BookExperimentModal = ({
   const [inventoryError, setInventoryError] = useState<string | null>(null);
   const [labList, setLabList] = useState<LabRoom[]>([]);
 
-  console.log(experimentId);
-
   useEffect(() => {
     if (!isModalOpen) {
       setEditMode(false);
@@ -64,7 +62,6 @@ const BookExperimentModal = ({
       }
       const data = await response.json();
       setLabList(data);
-      console.log(data);
     } catch (error) {
       setInventoryError(
         error instanceof Error ? error.message : 'Failed to load labs'
@@ -196,7 +193,6 @@ const BookExperimentModal = ({
         ),
       };
 
-      console.log(experimentData);
       const response = await fetch('/api/experiment', {
         method: 'POST',
         headers: {
@@ -284,7 +280,6 @@ const BookExperimentModal = ({
         ),
       };
 
-      console.log(experimentData);
       const response = await fetch(`/api/experiment/${experimentId}`, {
         method: 'PUT',
         headers: {

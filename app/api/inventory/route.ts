@@ -69,8 +69,6 @@ export async function PUT(request: NextRequest) {
     let { id } = data;
     const { name, ...updateData } = data;
 
-    console.log('data:', data);
-
     if (!id && !name) {
       return NextResponse.json(
         { error: 'Inventory ID or Name is required' },

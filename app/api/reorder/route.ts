@@ -122,8 +122,6 @@ export async function PUT(request: NextRequest) {
     const { id } = data;
     const { name, quantity, status } = data;
 
-    console.log('data:', data);
-
     if (!id && !name) {
       return NextResponse.json(
         { error: 'Reorder ID or Name is required' },

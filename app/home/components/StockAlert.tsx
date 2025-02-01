@@ -35,8 +35,6 @@ export default function StockAlert() {
           new Date(b.arrivalDate).getTime() - new Date(a.arrivalDate).getTime()
       );
 
-      console.log(sortedData);
-
       setStockAlerts(sortedData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

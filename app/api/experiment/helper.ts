@@ -11,7 +11,6 @@ export async function processInventory(
   items: InventoryItem[],
   experimentStartDate: Date
 ) {
-  console.log('Processing inventory for experiment:', items);
   const arrivalDate = new Date(experimentStartDate);
   arrivalDate.setDate(arrivalDate.getDate() - 3);
 
@@ -39,7 +38,6 @@ export async function processInventory(
 
           // If there's an existing reorder, update its quantity
           if (existingReorder) {
-            console.log(existingReorder);
             const newQuantity = Math.max(existingReorder.quantity + quantity);
             await prisma.reorder.update({
               where: {
@@ -50,8 +48,6 @@ export async function processInventory(
               },
             });
 
-            console.log('Updating reorder', name, 'NEWquantity', newQuantity);
-
             // If the new quantity is 0, we can delete the reorder entry
             if (newQuantity <= 0) {
               await prisma.reorder.delete({
@@ -61,7 +57,6 @@ export async function processInventory(
               });
 
               if (newQuantity < 0) {
-                console.log('Returning', -newQuantity, 'of', name);
                 await prisma.inventory.update({
                   where: { id: inventory.id },
                   data: { stockLevel: { increment: -newQuantity } },
@@ -77,15 +72,6 @@ export async function processInventory(
         const allocated = Math.min(remainingQuantity, inventory.stockLevel);
         remainingQuantity -= allocated;
 
-        console.log(
-          'Allocating',
-          allocated,
-          'of',
-          name,
-          'from',
-          inventory.name
-        );
-
         await prisma.inventory.update({
           where: { id: inventory.id },
           data: { stockLevel: { decrement: allocated } },
@@ -99,7 +85,6 @@ export async function processInventory(
           updatedInventory &&
           updatedInventory.stockLevel < updatedInventory.lowStockThreshold
         ) {
-          console.log('Reordering', name, 'from', inventory.name);
           await prisma.reorder.create({
             data: {
               inventoryId: updatedInventory.id,
@@ -114,14 +99,12 @@ export async function processInventory(
       }
 
       if (remainingQuantity > 0) {
-        console.log('Reordering', remainingQuantity, 'of', name);
         const inventory = await prisma.inventory.findFirst({ where: { name } });
 
         if (!inventory) {
           throw new Error(`Inventory item "${name}" not found.`);
         }
 
-        console.log('Reordering', name, 'amount', remainingQuantity);
         await prisma.reorder.create({
           data: {
             inventoryId: inventory.id,
