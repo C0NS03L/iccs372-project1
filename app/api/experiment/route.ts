@@ -5,46 +5,58 @@ import { toZonedTime } from 'date-fns-tz';
 
 const prisma = new PrismaClient();
 
+interface InventoryItem {
+  name: string;
+  quantity: number;
+}
+
 interface ExperimentData {
   title: string;
   description: string;
   startDate: string;
   endDate: string;
   items: InventoryItem[];
+  labRoomId: string;
 }
 
 function validateExperimentData(data: ExperimentData) {
-  const { title, description, startDate, endDate, items } = data;
+  const { title, description, startDate, endDate, items, labRoomId } = data;
 
   if (
     !title ||
     !description ||
     !startDate ||
     !endDate ||
-    !Array.isArray(items)
+    !items ||
+    !labRoomId
   ) {
     throw new Error('Missing required fields or invalid format');
   }
 
   const start = new Date(startDate);
   const end = new Date(endDate);
+  const labRoomIdBigInt = BigInt(labRoomId);
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    throw new Error('Invalid date format');
+  }
 
   if (start > end) {
     throw new Error('Start date cannot be after end date');
   }
 
-  return { title, description, start, end, items };
+  return { title, description, start, end, items, labRoomId: labRoomIdBigInt };
 }
 
-async function checkTimeslotConflicts(start: Date, end: Date) {
+async function checkTimeslotConflicts(
+  start: Date,
+  end: Date,
+  labRoomId: bigint
+) {
   const conflict = await prisma.experiments.findFirst({
     where: {
-      OR: [
-        {
-          startDate: { lt: end },
-          endDate: { gt: start },
-        },
-      ],
+      labRoomId,
+      OR: [{ startDate: { lt: end }, endDate: { gt: start } }],
     },
   });
 
@@ -55,20 +67,14 @@ async function checkTimeslotConflicts(start: Date, end: Date) {
       take: 3,
     });
 
-    return NextResponse.json(
-      {
-        error: 'Timeslot conflicts with existing experiment',
-        alternativeSlots,
-      },
-      { status: 409 }
-    );
+    throw {
+      status: 409,
+      message: 'Timeslot conflicts with an existing experiment',
+      alternativeSlots,
+    };
   }
 }
 
-interface InventoryItem {
-  name: string;
-  quantity: number;
-}
 async function processInventory(
   items: InventoryItem[],
   experimentStartDate: Date
@@ -92,7 +98,6 @@ async function processInventory(
         where: { id: inventory.id },
         data: { stockLevel: { decrement: allocated } },
       });
-      console.log(`Allocated ${allocated} of ${name} from ${inventory.name}`);
 
       const updatedInventory = await prisma.inventory.findUnique({
         where: { id: inventory.id },
@@ -111,14 +116,11 @@ async function processInventory(
             arrivalDate,
           },
         });
-        console.log(`Reordered ${name} for ${updatedInventory.name}`);
       }
     }
 
     if (remainingQuantity > 0) {
-      const inventory = await prisma.inventory.findFirst({
-        where: { name },
-      });
+      const inventory = await prisma.inventory.findFirst({ where: { name } });
 
       if (!inventory) {
         throw new Error(`Inventory item "${name}" not found.`);
@@ -136,11 +138,6 @@ async function processInventory(
   }
 }
 
-interface CustomError extends Error {
-  status?: number;
-  alternativeSlots?: never[];
-}
-
 async function updateExperimentStatus(experimentId: bigint, timezone: string) {
   const experiment = await prisma.experiments.findUnique({
     where: { id: experimentId },
@@ -150,15 +147,14 @@ async function updateExperimentStatus(experimentId: bigint, timezone: string) {
     throw new Error('Experiment not found');
   }
 
-  const now = new Date();
-  const zonedNow = toZonedTime(now, timezone);
+  const now = toZonedTime(new Date(), timezone);
   const zonedStart = toZonedTime(experiment.startDate, timezone);
   const zonedEnd = toZonedTime(experiment.endDate, timezone);
 
   let status = 'PENDING';
-  if (zonedNow >= zonedStart && zonedNow <= zonedEnd) {
+  if (now >= zonedStart && now <= zonedEnd) {
     status = 'ONGOING';
-  } else if (zonedNow > zonedEnd) {
+  } else if (now > zonedEnd) {
     status = 'COMPLETED';
   }
 
@@ -171,11 +167,11 @@ async function updateExperimentStatus(experimentId: bigint, timezone: string) {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const data: ExperimentData = await request.json();
-    const { title, description, start, end, items } =
+    const { title, description, start, end, items, labRoomId } =
       validateExperimentData(data);
 
-    await checkTimeslotConflicts(start, end);
-    await processInventory(items);
+    await checkTimeslotConflicts(start, end, labRoomId);
+    await processInventory(items, start);
 
     const newExperiment = await prisma.experiments.create({
       data: {
@@ -183,33 +179,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         description,
         startDate: start.toISOString(),
         endDate: end.toISOString(),
+        labRoomId,
       },
     });
 
-    await updateExperimentStatus(newExperiment.id, 'UTC'); // Update status based on timezone
-
-    const response = JSON.parse(JSON.stringify(newExperiment, bigIntReplacer));
-
-    return NextResponse.json(response, { status: 201 });
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      const customError = error as CustomError;
-      if (customError.status) {
-        return NextResponse.json(
-          {
-            error: customError.message,
-            ...(customError.alternativeSlots && {
-              alternativeSlots: customError.alternativeSlots,
-            }),
-          },
-          { status: customError.status }
-        );
-      }
-    }
+    await updateExperimentStatus(newExperiment.id, 'UTC');
 
     return NextResponse.json(
-      { error: 'Failed to process request: ' + (error as Error).message },
-      { status: 500 }
+      JSON.parse(JSON.stringify(newExperiment, bigIntReplacer)),
+      { status: 201 }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error.message || 'Failed to process request',
+        alternativeSlots: error.alternativeSlots,
+      },
+      { status: error.status || 500 }
     );
   }
 }
@@ -217,13 +203,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 export async function GET() {
   try {
     const experiments = await prisma.experiments.findMany({
-      select: {
-        startDate: true,
-        title: true,
-        description: true,
-        status: true,
-      },
+      select: { startDate: true, title: true, description: true, status: true },
     });
+
     return NextResponse.json(experiments, { status: 200 });
   } catch (error) {
     console.error(error);
@@ -238,7 +220,6 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const data = await request.json();
 
     if (!id) {
       return NextResponse.json(
@@ -248,17 +229,12 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     }
 
     const experimentId = BigInt(id);
-
-    const { title, description, start, end, items } =
+    const data: ExperimentData = await request.json();
+    const { title, description, start, end, items, labRoomId } =
       validateExperimentData(data);
 
-    if (start || end) {
-      await checkTimeslotConflicts(start, end);
-    }
-
-    if (items && items.length > 0) {
-      await processInventory(items);
-    }
+    await checkTimeslotConflicts(start, end, labRoomId);
+    await processInventory(items, start);
 
     const updatedExperiment = await prisma.experiments.update({
       where: { id: experimentId },
@@ -272,15 +248,14 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
 
     await updateExperimentStatus(updatedExperiment.id, 'UTC');
 
-    const response = JSON.parse(
-      JSON.stringify(updatedExperiment, bigIntReplacer)
+    return NextResponse.json(
+      JSON.parse(JSON.stringify(updatedExperiment, bigIntReplacer)),
+      { status: 200 }
     );
-
-    return NextResponse.json(response, { status: 200 });
-  } catch (error: unknown) {
+  } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: 'Failed to update experiment: ' + (error as Error).message },
+      { error: error.message || 'Failed to update experiment' },
       { status: 500 }
     );
   }

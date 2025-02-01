@@ -95,7 +95,6 @@ export async function PATCH(request: NextRequest) {
       updates.lastPerformed = new Date();
     }
 
-
     const updatedTask = await prisma.task.update({
       where: { id: BigInt(taskId) },
       data: updates,
