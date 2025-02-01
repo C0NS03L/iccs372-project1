@@ -1,19 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { bigIntReplacer } from '@/app/lib/common';
 
 const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    const reorders = await prisma.reorder.findMany({
-      select: {
-        inventoryName: true,
+    const reorders = await prisma.reorder.groupBy({
+      by: ['inventoryName'],
+      _sum: {
         quantity: true,
+      },
+      _max: {
         status: true,
         createdAt: true,
       },
     });
-    return NextResponse.json(reorders, { status: 200 });
+
+    const formattedReorders = reorders.map((reorder) => ({
+      inventoryName: reorder.inventoryName,
+      quantity: reorder._sum.quantity,
+      status: reorder._max.status,
+      createdAt: reorder._max.createdAt,
+    }));
+
+    // use bigInt replacer
+    return NextResponse.json(formattedReorders, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -22,6 +34,7 @@ export async function GET() {
     );
   }
 }
+
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
@@ -46,7 +59,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(newReorder, { status: 201 });
+    const newReorderWithStringId = JSON.parse(
+      JSON.stringify(newReorder, bigIntReplacer)
+    );
+
+    return NextResponse.json(newReorderWithStringId, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
