@@ -93,6 +93,21 @@ async function updateExperimentStatus(experimentId: bigint, timezone: string) {
   });
 }
 
+async function checkEnoughInventory(items: InventoryItem[], startDate: Date) {
+  if (startDate < new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)) {
+    for (const { name, quantity } of items) {
+      const inventory = await prisma.inventory.findFirst({
+        where: { name },
+        orderBy: { stockLevel: 'desc' },
+      });
+
+      if (!inventory || inventory.stockLevel < quantity) {
+        throw new Error(`Insufficient stock for ${name}`);
+      }
+    }
+  }
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const data: ExperimentData = await request.json();
@@ -100,6 +115,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       validateExperimentData(data);
 
     await checkTimeslotConflicts(start, end, labRoomId);
+    await checkEnoughInventory(items, start);
     await processInventory(items, start);
 
     const newExperiment = await prisma.experiments.create({

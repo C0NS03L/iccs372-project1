@@ -89,6 +89,8 @@ export async function POST(request: NextRequest) {
   try {
     const { inventoryId, inventoryName, quantity } = await request.json();
 
+    console.log(inventoryId, inventoryName, quantity);
+
     if (!inventoryId || !inventoryName || !quantity) {
       return NextResponse.json(
         { error: 'Missing required fields' },

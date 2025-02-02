@@ -25,6 +25,10 @@ export default function TodoList() {
     title: '',
     description: '',
     completed: false,
+    dueDate:
+      new Date(Date.now() + 7 * 60 * 60 * 1000) // Convert to UTC+7
+        .toISOString()
+        .slice(0, 10) + 'T23:59',
   });
 
   useEffect(() => {
@@ -35,7 +39,7 @@ export default function TodoList() {
     try {
       setLoading(true);
       // Format today's date as YYYY-MM-DD
-      const today = new Date('2025-01-28').toISOString().split('T')[0];
+      const today = new Date().toISOString().slice(0, 10);
       const response = await fetch(`/api/todo?query_date=${today}`);
 
       if (!response.ok) {
@@ -77,6 +81,7 @@ export default function TodoList() {
 
   const handleSubmitNewTask = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log(newTask);
     try {
       const response = await fetch('/api/task', {
         method: 'POST',
@@ -239,17 +244,18 @@ export default function TodoList() {
                 </label>
                 <input
                   type='datetime-local'
-                  value={newTask.dueDate || ''}
                   onChange={(e) =>
                     setNewTask({ ...newTask, dueDate: e.target.value })
                   }
+                  defaultValue={
+                    new Date(Date.now() + 7 * 60 * 60 * 1000) // Convert to UTC+7
+                      .toISOString()
+                      .slice(0, 10) + 'T23:59'
+                  }
                   className='w-full rounded-md border border-gray-600 bg-gray-700 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
-                  min='2025-01-28T14:44:24'
-                  max='2025-01-28T23:59:59'
                 />
                 <p className='mt-1 text-sm text-gray-400'>
-                  If not specified, due date will be set to end of today
-                  (23:59:59)
+                  Default is end of today (23:59:59) GMT+7
                 </p>
               </div>
 
