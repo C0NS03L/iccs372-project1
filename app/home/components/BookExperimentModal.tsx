@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
-import { useEffect, Key, useState, useCallback } from 'react';
+import { useEffect, Key, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -69,41 +69,38 @@ const BookExperimentModal = ({
     }
   };
 
-  const fetchExperimentData = useCallback(
-    async (id: string) => {
-      try {
-        const response = await fetch(`/api/experiment/${id}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch experiment data');
-        }
-        const data = await response.json();
-        setNewExperiment({
-          title: data.title,
-          description: data.description,
-          room: data.labRoomId,
-          startDate: new Date(data.startDate),
-          endDate: new Date(data.endDate),
-        });
-        setStockNeeded(
-          data.items.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            unit: item.unit,
-            available: inventory.find((invItem) => invItem.id === item.id)
-              ?.stockLevel,
-          }))
-        );
-      } catch (error) {
-        setError(
-          error instanceof Error
-            ? error.message
-            : 'Failed to load experiment data'
-        );
+  const fetchExperimentData = async (id: string) => {
+    try {
+      const response = await fetch(`/api/experiment/${id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch experiment data');
       }
-    },
-    [inventory, setNewExperiment, setStockNeeded]
-  );
+      const data = await response.json();
+      setNewExperiment({
+        title: data.title,
+        description: data.description,
+        room: data.labRoomId,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+      });
+      setStockNeeded(
+        data.items.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          available: inventory.find((invItem) => invItem.id === item.id)
+            ?.stockLevel,
+        }))
+      );
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to load experiment data'
+      );
+    }
+  };
 
   useEffect(() => {
     if (isModalOpen) {
@@ -116,7 +113,7 @@ const BookExperimentModal = ({
         setEditMode(false);
       }
     }
-  }, [isModalOpen, experimentId, fetchExperimentData]);
+  }, [isModalOpen, experimentId]);
 
   const fetchInventory = async () => {
     try {
