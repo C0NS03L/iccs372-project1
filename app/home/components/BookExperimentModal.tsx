@@ -222,8 +222,8 @@ const BookExperimentModal = ({
         title: '',
         description: '',
         room: '',
-        startDate: new Date('2025-01-28T15:21:47Z'),
-        endDate: new Date('2025-01-28T15:21:47Z'),
+        startDate: new Date(Date.now()),
+        endDate: new Date(Date.now()),
       });
       setStockNeeded([]);
       setSearchQuery('');
@@ -309,8 +309,8 @@ const BookExperimentModal = ({
         title: '',
         description: '',
         room: '',
-        startDate: new Date('2025-01-28T15:21:47Z'),
-        endDate: new Date('2025-01-28T15:21:47Z'),
+        startDate: new Date(Date.now()),
+        endDate: new Date(Date.now()),
       });
       setStockNeeded([]);
       setSearchQuery('');
@@ -341,8 +341,8 @@ const BookExperimentModal = ({
         title: '',
         description: '',
         room: '',
-        startDate: new Date('2025-01-28T15:21:47Z'),
-        endDate: new Date('2025-01-28T15:21:47Z'),
+        startDate: new Date(Date.now()),
+        endDate: new Date(Date.now()),
       });
       setStockNeeded([]);
       setSearchQuery('');
@@ -413,7 +413,7 @@ const BookExperimentModal = ({
                 showTimeSelect
                 dateFormat='Pp'
                 className='w-full rounded border border-gray-700 bg-gray-700 p-2 text-white'
-                minDate={new Date('2025-01-28T15:21:47Z')}
+                minDate={new Date(Date.now())}
               />
             </div>
             <label

@@ -77,6 +77,7 @@ export async function PATCH(request: NextRequest) {
     const { taskId, completed } = data;
 
     if (!taskId || typeof completed !== 'boolean') {
+      console.log('Invalid or missing taskId or completed status');
       return NextResponse.json(
         { error: 'Invalid or missing taskId or completed status' },
         { status: 400 }
@@ -93,13 +94,13 @@ export async function PATCH(request: NextRequest) {
 
     const updates: {
       completed?: boolean;
-      lastPerformed?: Date;
+      // lastPerfor/med?: Date;
       dueDate?: Date;
     } = { completed };
 
-    if (completed) {
-      updates.lastPerformed = new Date();
-    }
+    // if (completed) {
+    //   updates.lastPerformed = new Date();
+    // }
 
     const updatedTask = await prisma.task.update({
       where: { id: BigInt(taskId) },
@@ -112,6 +113,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json(updatedTaskWithStringId, { status: 200 });
   } catch (error) {
+    console.error('Failed to update task:', (error as Error).message);
     return NextResponse.json(
       { error: 'Failed to update task: ' + (error as Error).message },
       { status: 500 }
